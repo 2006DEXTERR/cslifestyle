@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
+    --primary: 0 0% 7%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 7%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 7%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 328 85% 52%;
+    --radius: 0.5rem;
+
+    /* Brand Colors */
+    --brand-pink: 328 85% 52%;
+    --brand-red: 0 100% 65%;
+    --brand-orange: 28 100% 50%;
+    --brand-yellow: 45 100% 51%;
+
+    --chart-1: 328 85% 52%;
+    --chart-2: 0 100% 65%;
+    --chart-3: 28 100% 50%;
+    --chart-4: 45 100% 51%;
+    --chart-5: 200 80% 55%;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 7%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 328 85% 52%;
+
+    --chart-1: 328 85% 60%;
+    --chart-2: 0 100% 65%;
+    --chart-3: 28 100% 55%;
+    --chart-4: 45 100% 55%;
+    --chart-5: 200 80% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .brand-gradient {
+    background: linear-gradient(135deg, #E91E8F 0%, #FF4D4D 33%, #FF7A00 66%, #FFC107 100%);
+  }
+
+  .brand-gradient-to-r {
+    background: linear-gradient(to right, #E91E8F, #FF4D4D, #FF7A00, #FFC107);
+  }
+
+  .brand-gradient-text {
+    background: linear-gradient(135deg, #E91E8F 0%, #FF4D4D 33%, #FF7A00 66%, #FFC107 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .brand-gradient-border {
+    border-image: linear-gradient(135deg, #E91E8F, #FF4D4D, #FF7A00, #FFC107) 1;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
