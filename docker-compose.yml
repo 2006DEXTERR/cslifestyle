@@ -1,0 +1,80 @@
+# CSLifestyle local infrastructure + optional app stack.
+#
+#   docker compose up -d                 # Postgres + Redis only (run API via `npm run dev`)
+#   docker compose --profile app up -d   # full stack: Postgres + Redis + API + worker
+#
+# Phase 0: only Postgres and Redis are required for local development.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cslifestyle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cslifestyle
+      POSTGRES_PASSWORD: cslifestyle
+      POSTGRES_DB: cslifestyle
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cslifestyle -d cslifestyle']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cslifestyle-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./server
+    container_name: cslifestyle-api
+    restart: unless-stopped
+    command: ['node', 'dist/index.js']
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgresql://cslifestyle:cslifestyle@postgres:5432/cslifestyle?schema=public
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles: ['app']
+
+  worker:
+    build: ./server
+    container_name: cslifestyle-worker
+    restart: unless-stopped
+    command: ['node', 'dist/jobs/worker.js']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://cslifestyle:cslifestyle@postgres:5432/cslifestyle?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles: ['app']
+
+volumes:
+  pgdata:
+  redisdata:
