@@ -4,9 +4,26 @@ import * as React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
-import { brands } from '@/lib/data';
+import { catalogApi, type CatalogBrand } from '@/lib/api/catalog';
 
 export default function BrandsPage() {
+  const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    catalogApi
+      .listBrands()
+      .then((data) => {
+        if (active) setBrands(data);
+      })
+      .catch(() => {
+        if (active) setBrands([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <section className="py-12 bg-muted/30 border-b">

@@ -1,71 +1,44 @@
-'use client';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { BrandDetail } from './brand-detail';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { buildMetadata, breadcrumbJsonLd } from '@/lib/seo';
+import { getBrand, listBrandSlugs, listProductsByBrand } from '@/lib/api/ssr';
 
-import * as React from 'react';
-import { use } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ChevronRight, Star, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ProductCard } from '@/components/products/ProductCard';
-import { brands, products } from '@/lib/data';
+export const revalidate = 3600; // ISR
 
-export default function BrandPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
-  const brand = brands.find((b) => b.slug === slug);
-  const brandProducts = products.filter((p) => p.brandSlug === slug);
+export async function generateStaticParams() {
+  return (await listBrandSlugs()).map((slug) => ({ slug }));
+}
 
-  if (!brand) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">Brand Not Found</h1>
-      </div>
-    );
-  }
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const brand = await getBrand(params.slug);
+  if (!brand) return { title: 'Brand Not Found' };
+  return buildMetadata({
+    title: brand.seoTitle || `${brand.name} Products — Reviews & Prices`,
+    description: brand.metaDescription || brand.description,
+    path: `/brands/${brand.slug}`,
+    image: brand.logo || undefined,
+    type: 'website',
+  });
+}
+
+export default async function BrandPage({ params }: { params: { slug: string } }) {
+  const brand = await getBrand(params.slug);
+  if (!brand) notFound();
+
+  const products = await listProductsByBrand(brand.slug, 100);
 
   return (
-    <div className="min-h-screen">
-      <section className="py-12 bg-muted/30 border-b">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <a href="/" className="hover:text-foreground">Home</a>
-            <ChevronRight className="w-4 h-4" />
-            <a href="/brands" className="hover:text-foreground">Brands</a>
-            <ChevronRight className="w-4 h-4" />
-            <span>{brand.name}</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-2xl bg-muted flex items-center justify-center">
-              <span className="text-4xl font-bold">{brand.name[0]}</span>
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold">{brand.name}</h1>
-              <p className="text-muted-foreground mt-1 max-w-xl">{brand.description}</p>
-              <div className="flex items-center gap-4 mt-4">
-                <div className="flex items-center gap-1">
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">{brand.rating}</span>
-                </div>
-                <span className="text-muted-foreground">{brand.productCount} products</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="container mx-auto px-4 py-12">
-        <h2 className="text-2xl font-bold mb-6">All {brand.name} Products</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-          {brandProducts.map((product) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <ProductCard product={product} />
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <>
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: 'Home', path: '/' },
+          { name: 'Brands', path: '/brands' },
+          { name: brand.name, path: `/brands/${brand.slug}` },
+        ])}
+      />
+      <BrandDetail brand={brand} brandProducts={products} />
+    </>
   );
 }

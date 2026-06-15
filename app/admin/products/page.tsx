@@ -16,289 +16,241 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   Plus,
-  MoreHorizontal,
-  ChevronDown,
-  ChevronsUpDown,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   Edit,
   Trash2,
-  Eye,
-  Copy,
   X,
   Upload,
   Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import {
+  catalogApi,
+  type CatalogProduct,
+  type CatalogCategory,
+  type CatalogBrand,
+} from '@/lib/api/catalog';
+import { formatNumber, formatDate } from '@/lib/format';
 
-// Mock data
-const mockProducts = [
-  {
-    id: '1',
-    name: 'iPhone 15 Pro Max',
-    slug: 'iphone-15-pro-max',
-    category: 'Smartphones',
-    brand: 'Apple',
-    price: 134900,
-    rating: 4.8,
-    status: 'Published',
-    updatedAt: '2024-01-15',
-    image: 'https://images.pexels.com/photos/69926/computer-smartphone-typography-smart-69926.jpeg?w=100',
-  },
-  {
-    id: '2',
-    name: 'Samsung Galaxy S24 Ultra',
-    slug: 'samsung-galaxy-s24-ultra',
-    category: 'Smartphones',
-    brand: 'Samsung',
-    price: 129999,
-    rating: 4.7,
-    status: 'Published',
-    updatedAt: '2024-01-14',
-    image: 'https://images.pexels.com/photos/69926/computer-smartphone-typography-smart-69926.jpeg?w=100',
-  },
-  {
-    id: '3',
-    name: 'MacBook Pro 14" M3',
-    slug: 'macbook-pro-14-m3',
-    category: 'Laptops',
-    brand: 'Apple',
-    price: 169900,
-    rating: 4.9,
-    status: 'Draft',
-    updatedAt: '2024-01-13',
-    image: 'https://images.pexels.com/photos/20511/pexels-photo.jpg?w=100',
-  },
-  {
-    id: '4',
-    name: 'Sony WH-1000XM5',
-    slug: 'sony-wh-1000xm5',
-    category: 'Audio',
-    brand: 'Sony',
-    price: 29990,
-    rating: 4.7,
-    status: 'Published',
-    updatedAt: '2024-01-12',
-    image: 'https://images.pexels.com/photos/3394662/pexels-photo-3394662.jpeg?w=100',
-  },
-  {
-    id: '5',
-    name: 'Apple Watch Ultra 2',
-    slug: 'apple-watch-ultra-2',
-    category: 'Smartwatches',
-    brand: 'Apple',
-    price: 89900,
-    rating: 4.8,
-    status: 'Published',
-    updatedAt: '2024-01-11',
-    image: 'https://images.pexels.com/photos/437036/pexels-photo-437036.jpeg?w=100',
-  },
-  {
-    id: '6',
-    name: 'boAt Airdopes 441',
-    slug: 'boat-airdotes-441',
-    category: 'Audio',
-    brand: 'boAt',
-    price: 1299,
-    rating: 4.2,
-    status: 'Published',
-    updatedAt: '2024-01-10',
-    image: 'https://images.pexels.com/photos/3780695/pexels-photo-3780695.jpeg?w=100',
-  },
-  {
-    id: '7',
-    name: 'LG C3 OLED 55"',
-    slug: 'lg-c3-oled-55',
-    category: 'Televisions',
-    brand: 'LG',
-    price: 116990,
-    rating: 4.9,
-    status: 'Draft',
-    updatedAt: '2024-01-09',
-    image: 'https://images.pexels.com/photos/400613/pexels-photo-400613.jpeg?w=100',
-  },
-  {
-    id: '8',
-    name: 'OnePlus 12',
-    slug: 'oneplus-12',
-    category: 'Smartphones',
-    brand: 'OnePlus',
-    price: 64999,
-    rating: 4.6,
-    status: 'Published',
-    updatedAt: '2024-01-08',
-    image: 'https://images.pexels.com/photos/69926/computer-smartphone-typography-smart-69926.jpeg?w=100',
-  },
-];
+interface ProductRow {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  brand: string;
+  price: number;
+  rating: number;
+  status: 'Published' | 'Draft';
+  updatedAt: string;
+  image: string;
+  raw: CatalogProduct;
+}
 
-type Product = typeof mockProducts[0];
+function toRow(p: CatalogProduct): ProductRow {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    category: p.category,
+    brand: p.brand,
+    price: p.currentPrice,
+    rating: p.rating,
+    status: p.isPublished ? 'Published' : 'Draft',
+    updatedAt: p.updatedAt,
+    image: p.image,
+    raw: p,
+  };
+}
 
 export default function ProductsAdminPage() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [selectedRows, setSelectedRows] = React.useState<string[]>([]);
   const [isEditorOpen, setIsEditorOpen] = React.useState(false);
-  const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = React.useState<CatalogProduct | null>(null);
 
-  const columns: ColumnDef<Product>[] = [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <input
-          type="checkbox"
-          checked={table.getIsAllPageRowsSelected()}
-          onChange={table.getToggleAllPageRowsSelectedHandler()}
-          className="rounded border"
-        />
-      ),
-      cell: ({ row }) => (
-        <input
-          type="checkbox"
-          checked={row.getIsSelected()}
-          onChange={row.getToggleSelectedHandler()}
-          className="rounded border"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
+  const [products, setProducts] = React.useState<ProductRow[]>([]);
+  const [categories, setCategories] = React.useState<CatalogCategory[]>([]);
+  const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const { items } = await catalogApi.listProducts({ status: 'all', perPage: 200, sort: 'newest' });
+      setProducts(items.map(toRow));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refresh();
+    catalogApi.listCategories({ status: 'all', parent: 'all' }).then(setCategories).catch(() => setCategories([]));
+    catalogApi.listBrands({ status: 'all' }).then(setBrands).catch(() => setBrands([]));
+  }, [refresh]);
+
+  const handleDelete = React.useCallback(
+    async (id: string) => {
+      if (!window.confirm('Delete this product? This cannot be undone.')) return;
+      await catalogApi.deleteProduct(id);
+      await refresh();
     },
-    {
-      accessorKey: 'image',
-      header: '',
-      cell: ({ row }) => (
-        <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted">
-          <img
-            src={row.original.image}
-            alt={row.original.name}
-            className="w-full h-full object-cover"
+    [refresh],
+  );
+
+  const handleBulk = React.useCallback(
+    async (action: 'publish' | 'unpublish' | 'delete') => {
+      if (selectedRows.length === 0) return;
+      if (action === 'delete' && !window.confirm(`Delete ${selectedRows.length} product(s)?`)) return;
+      await catalogApi.bulkProducts(action, selectedRows);
+      setSelectedRows([]);
+      await refresh();
+    },
+    [selectedRows, refresh],
+  );
+
+  const columns = React.useMemo<ColumnDef<ProductRow>[]>(
+    () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <input
+            type="checkbox"
+            checked={table.getIsAllPageRowsSelected()}
+            onChange={table.getToggleAllPageRowsSelectedHandler()}
+            className="rounded border"
           />
-        </div>
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: 'name',
-      header: 'Product Name',
-      cell: ({ row }) => (
-        <div>
-          <p className="font-medium">{row.original.name}</p>
-          <p className="text-xs text-muted-foreground">{row.original.slug}</p>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'category',
-      header: ({ column }) => (
-        <button
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="flex items-center gap-1"
-        >
-          Category
-          <ArrowUpDown className="w-4 h-4" />
-        </button>
-      ),
-    },
-    {
-      accessorKey: 'brand',
-      header: 'Brand',
-    },
-    {
-      accessorKey: 'price',
-      header: ({ column }) => (
-        <button
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="flex items-center gap-1"
-        >
-          Price
-          <ArrowUpDown className="w-4 h-4" />
-        </button>
-      ),
-      cell: ({ row }) => (
-        <span className="font-medium">
-          Rs {row.original.price.toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'rating',
-      header: 'Rating',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-          <span>{row.original.rating}</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.status === 'Published'
-              ? 'bg-green-500/10 text-green-600'
-              : 'bg-yellow-500/10 text-yellow-600'
-          }`}
-        >
-          {row.original.status}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'updatedAt',
-      header: 'Last Updated',
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {new Date(row.original.updatedAt).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setEditingProduct(row.original);
-              setIsEditorOpen(true);
-            }}
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            className="rounded border"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: 'image',
+        header: '',
+        cell: ({ row }) => (
+          <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted">
+            <img src={row.original.image} alt={row.original.name} className="w-full h-full object-cover" />
+          </div>
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: 'name',
+        header: 'Product Name',
+        cell: ({ row }) => (
+          <div>
+            <p className="font-medium">{row.original.name}</p>
+            <p className="text-xs text-muted-foreground">{row.original.slug}</p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'category',
+        header: ({ column }) => (
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')} className="flex items-center gap-1">
+            Category
+            <ArrowUpDown className="w-4 h-4" />
+          </button>
+        ),
+      },
+      { accessorKey: 'brand', header: 'Brand' },
+      {
+        accessorKey: 'price',
+        header: ({ column }) => (
+          <button onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')} className="flex items-center gap-1">
+            Price
+            <ArrowUpDown className="w-4 h-4" />
+          </button>
+        ),
+        cell: ({ row }) => <span className="font-medium">Rs {formatNumber(row.original.price)}</span>,
+      },
+      {
+        accessorKey: 'rating',
+        header: 'Rating',
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1">
+            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+            <span>{row.original.rating}</span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${
+              row.original.status === 'Published' ? 'bg-green-500/10 text-green-600' : 'bg-yellow-500/10 text-yellow-600'
+            }`}
           >
-            <Edit className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon">
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+            {row.original.status}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'updatedAt',
+        header: 'Last Updated',
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">{formatDate(row.original.updatedAt)}</span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setEditingProduct(row.original.raw);
+                setIsEditorOpen(true);
+              }}
+            >
+              <Edit className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => handleDelete(row.original.id)}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [handleDelete],
+  );
 
   const table = useReactTable({
-    data: mockProducts,
+    data: products,
     columns,
+    getRowId: (row) => row.id,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    state: {
-      sorting,
-      columnFilters,
-    },
+    state: { sorting, columnFilters },
     onRowSelectionChange: (updater) => {
-      const newSelection = typeof updater === 'function'
-        ? updater(Object.fromEntries(selectedRows.map(r => [r, true])))
-        : updater;
-      setSelectedRows(Object.keys(newSelection));
+      const newSelection =
+        typeof updater === 'function' ? updater(Object.fromEntries(selectedRows.map((r) => [r, true]))) : updater;
+      setSelectedRows(Object.keys(newSelection).filter((k) => newSelection[k]));
     },
   });
+
+  const categoryNames = Array.from(new Set(categories.map((c) => c.name)));
+  const brandNames = Array.from(new Set(brands.map((b) => b.name)));
 
   return (
     <div className="space-y-6">
@@ -337,11 +289,11 @@ export default function ProductsAdminPage() {
           onChange={(e) => table.getColumn('category')?.setFilterValue(e.target.value)}
         >
           <option value="">All Categories</option>
-          <option value="Smartphones">Smartphones</option>
-          <option value="Laptops">Laptops</option>
-          <option value="Audio">Audio</option>
-          <option value="Smartwatches">Smartwatches</option>
-          <option value="Televisions">Televisions</option>
+          {categoryNames.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
         </select>
         <select
           className="h-10 rounded-lg border bg-background px-3 text-sm"
@@ -349,10 +301,11 @@ export default function ProductsAdminPage() {
           onChange={(e) => table.getColumn('brand')?.setFilterValue(e.target.value)}
         >
           <option value="">All Brands</option>
-          <option value="Apple">Apple</option>
-          <option value="Samsung">Samsung</option>
-          <option value="Sony">Sony</option>
-          <option value="boAt">boAt</option>
+          {brandNames.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
         </select>
         <select
           className="h-10 rounded-lg border bg-background px-3 text-sm"
@@ -371,16 +324,13 @@ export default function ProductsAdminPage() {
           <span className="text-sm">
             {selectedRows.length} product{selectedRows.length > 1 ? 's' : ''} selected
           </span>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => handleBulk('publish')}>
             Publish
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => handleBulk('unpublish')}>
             Unpublish
           </Button>
-          <Button variant="outline" size="sm">
-            Duplicate
-          </Button>
-          <Button variant="destructive" size="sm">
+          <Button variant="destructive" size="sm" onClick={() => handleBulk('delete')}>
             Delete
           </Button>
         </div>
@@ -394,16 +344,8 @@ export default function ProductsAdminPage() {
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                    <th key={header.id} className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
                 </tr>
@@ -415,7 +357,7 @@ export default function ProductsAdminPage() {
                   key={row.id}
                   className="hover:bg-muted/50 cursor-pointer"
                   onClick={() => {
-                    setEditingProduct(row.original);
+                    setEditingProduct(row.original.raw);
                     setIsEditorOpen(true);
                   }}
                 >
@@ -434,6 +376,20 @@ export default function ProductsAdminPage() {
                   ))}
                 </tr>
               ))}
+              {!loading && table.getRowModel().rows.length === 0 && (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    No products found.
+                  </td>
+                </tr>
+              )}
+              {loading && (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    Loading products…
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -441,29 +397,19 @@ export default function ProductsAdminPage() {
         {/* Pagination */}
         <div className="flex items-center justify-between px-4 py-3 border-t">
           <p className="text-sm text-muted-foreground">
-            Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+            Showing {table.getFilteredRowModel().rows.length === 0 ? 0 : table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
             {Math.min(
               (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-              table.getFilteredRowModel().rows.length
+              table.getFilteredRowModel().rows.length,
             )}{' '}
             of {table.getFilteredRowModel().rows.length} products
           </p>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
+            <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
               <ChevronLeft className="w-4 h-4" />
               Previous
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
+            <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
               Next
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -479,21 +425,99 @@ export default function ProductsAdminPage() {
           setEditingProduct(null);
         }}
         product={editingProduct}
+        categories={categories}
+        brands={brands}
+        onSaved={async () => {
+          setIsEditorOpen(false);
+          setEditingProduct(null);
+          await refresh();
+        }}
       />
     </div>
   );
 }
 
+const splitList = (s: string): string[] =>
+  s
+    .split(/[\n,]/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
 function ProductEditor({
   isOpen,
   onClose,
   product,
+  categories,
+  brands,
+  onSaved,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  product: Product | null;
+  product: CatalogProduct | null;
+  categories: CatalogCategory[];
+  brands: CatalogBrand[];
+  onSaved: () => void | Promise<void>;
 }) {
   const [activeTab, setActiveTab] = React.useState('general');
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const blank = {
+    asin: '',
+    title: '',
+    slug: '',
+    categoryId: '',
+    brandId: '',
+    description: '',
+    shortDescription: '',
+    highlights: '',
+    isPublished: false,
+    availability: 'In Stock',
+    image: '',
+    gallery: '',
+    specifications: '',
+    currentPrice: '',
+    originalPrice: '',
+    discountPercent: '',
+    seoTitle: '',
+    metaDescription: '',
+    affiliateUrl: '',
+  };
+  const [form, setForm] = React.useState(blank);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    setActiveTab('general');
+    setError(null);
+    if (product) {
+      setForm({
+        asin: product.asin ?? '',
+        title: product.title ?? product.name ?? '',
+        slug: product.slug ?? '',
+        categoryId: product.categoryId ?? '',
+        brandId: product.brandId ?? '',
+        description: product.description ?? '',
+        shortDescription: product.shortDescription ?? '',
+        highlights: (product.highlights ?? []).join(', '),
+        isPublished: product.isPublished ?? false,
+        availability: product.availability ?? 'In Stock',
+        image: product.image ?? '',
+        gallery: (product.gallery ?? []).join('\n'),
+        specifications: product.specifications ? JSON.stringify(product.specifications, null, 2) : '',
+        currentPrice: product.currentPrice != null ? String(product.currentPrice) : '',
+        originalPrice: product.originalPrice != null ? String(product.originalPrice) : '',
+        discountPercent: product.discountPercent != null ? String(product.discountPercent) : '',
+        seoTitle: product.seoTitle ?? '',
+        metaDescription: product.metaDescription ?? '',
+        affiliateUrl: product.affiliateUrl ?? '',
+      });
+    } else {
+      setForm(blank);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, product]);
+
+  const set = (k: keyof typeof blank, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   const tabs = [
     { id: 'general', label: 'General' },
@@ -503,6 +527,57 @@ function ProductEditor({
     { id: 'seo', label: 'SEO' },
     { id: 'affiliate', label: 'Affiliate' },
   ];
+
+  async function handleSave() {
+    setError(null);
+    if (!form.title.trim()) return setError('Product name is required.');
+    if (!form.categoryId) return setError('Please select a category.');
+    if (!product && !form.asin.trim()) return setError('ASIN is required for a new product.');
+
+    let specifications: unknown;
+    if (form.specifications.trim()) {
+      try {
+        specifications = JSON.parse(form.specifications);
+      } catch {
+        setActiveTab('specifications');
+        return setError('Specifications must be valid JSON.');
+      }
+    }
+
+    const payload: Record<string, unknown> = {
+      title: form.title.trim(),
+      slug: form.slug.trim() || undefined,
+      categoryId: form.categoryId,
+      brandId: form.brandId || null,
+      description: form.description || undefined,
+      shortDescription: form.shortDescription || undefined,
+      highlights: splitList(form.highlights),
+      isPublished: form.isPublished,
+      availability: form.availability,
+      image: form.image || undefined,
+      gallery: splitList(form.gallery),
+      specifications,
+      currentPrice: form.currentPrice ? Number(form.currentPrice) : undefined,
+      originalPrice: form.originalPrice ? Number(form.originalPrice) : undefined,
+      discountPercent: form.discountPercent ? Number(form.discountPercent) : undefined,
+      seoTitle: form.seoTitle || undefined,
+      metaDescription: form.metaDescription || undefined,
+      affiliateUrl: form.affiliateUrl || undefined,
+    };
+    if (!product) payload.asin = form.asin.trim();
+    else if (form.asin.trim()) payload.asin = form.asin.trim();
+
+    setSaving(true);
+    try {
+      if (product) await catalogApi.updateProduct(product.id, payload);
+      else await catalogApi.createProduct(payload);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save product.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -525,12 +600,8 @@ function ProductEditor({
             {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-background">
               <div>
-                <h2 className="text-lg font-semibold">
-                  {product ? 'Edit Product' : 'Add Product'}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {product?.name || 'Create a new product'}
-                </p>
+                <h2 className="text-lg font-semibold">{product ? 'Edit Product' : 'Add Product'}</h2>
+                <p className="text-sm text-muted-foreground">{product?.name || 'Create a new product'}</p>
               </div>
               <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="w-5 h-5" />
@@ -544,9 +615,7 @@ function ProductEditor({
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
+                    activeTab === tab.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {tab.label}
@@ -560,18 +629,18 @@ function ProductEditor({
                 <>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Product Name</label>
-                    <Input
-                      placeholder="Enter product name"
-                      defaultValue={product?.name}
-                    />
+                    <Input placeholder="Enter product name" value={form.title} onChange={(e) => set('title', e.target.value)} />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Slug</label>
-                    <Input
-                      placeholder="product-slug"
-                      defaultValue={product?.slug}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Slug</label>
+                      <Input placeholder="auto from name" value={form.slug} onChange={(e) => set('slug', e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">ASIN</label>
+                      <Input placeholder="B0..." value={form.asin} onChange={(e) => set('asin', e.target.value)} />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -579,28 +648,41 @@ function ProductEditor({
                       <label className="text-sm font-medium">Category</label>
                       <select
                         className="w-full h-10 rounded-lg border bg-background px-3"
-                        defaultValue={product?.category}
+                        value={form.categoryId}
+                        onChange={(e) => set('categoryId', e.target.value)}
                       >
-                        <option>Smartphones</option>
-                        <option>Laptops</option>
-                        <option>Audio</option>
-                        <option>Smartwatches</option>
-                        <option>Televisions</option>
+                        <option value="">Select category</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Brand</label>
                       <select
                         className="w-full h-10 rounded-lg border bg-background px-3"
-                        defaultValue={product?.brand}
+                        value={form.brandId}
+                        onChange={(e) => set('brandId', e.target.value)}
                       >
-                        <option>Apple</option>
-                        <option>Samsung</option>
-                        <option>Sony</option>
-                        <option>boAt</option>
-                        <option>OnePlus</option>
+                        <option value="">No brand</option>
+                        {brands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Short Description</label>
+                    <Input
+                      placeholder="One-line summary"
+                      value={form.shortDescription}
+                      onChange={(e) => set('shortDescription', e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -608,28 +690,43 @@ function ProductEditor({
                     <textarea
                       className="w-full min-h-[120px] rounded-lg border bg-background p-3 text-sm"
                       placeholder="Enter product description"
+                      value={form.description}
+                      onChange={(e) => set('description', e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Highlights</label>
-                    <Input placeholder="A17 Pro Chip, Titanium Design" />
+                    <label className="text-sm font-medium">Highlights (comma separated)</label>
+                    <Input
+                      placeholder="A17 Pro Chip, Titanium Design"
+                      value={form.highlights}
+                      onChange={(e) => set('highlights', e.target.value)}
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Status</label>
-                      <select className="w-full h-10 rounded-lg border bg-background px-3">
+                      <select
+                        className="w-full h-10 rounded-lg border bg-background px-3"
+                        value={form.isPublished ? 'Published' : 'Draft'}
+                        onChange={(e) => set('isPublished', e.target.value === 'Published')}
+                      >
                         <option>Published</option>
                         <option>Draft</option>
                       </select>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Availability</label>
-                      <select className="w-full h-10 rounded-lg border bg-background px-3">
+                      <select
+                        className="w-full h-10 rounded-lg border bg-background px-3"
+                        value={form.availability}
+                        onChange={(e) => set('availability', e.target.value)}
+                      >
                         <option>In Stock</option>
                         <option>Limited Stock</option>
                         <option>Out of Stock</option>
+                        <option>Pre-order</option>
                       </select>
                     </div>
                   </div>
@@ -638,42 +735,38 @@ function ProductEditor({
 
               {activeTab === 'images' && (
                 <div className="space-y-4">
-                  <div className="border-2 border-dashed rounded-xl p-12 text-center">
-                    <Upload className="w-10 h-10 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground mb-2">
-                      Drag and drop images here, or click to browse
-                    </p>
-                    <Button variant="outline">Browse Files</Button>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Main Image URL</label>
+                    <Input placeholder="https://…" value={form.image} onChange={(e) => set('image', e.target.value)} />
                   </div>
-
-                  <div className="grid grid-cols-4 gap-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="aspect-square rounded-lg bg-muted relative">
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="absolute -top-2 -right-2 w-6 h-6"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Gallery URLs (one per line)</label>
+                    <textarea
+                      className="w-full min-h-[120px] rounded-lg border bg-background p-3 text-sm"
+                      placeholder={'https://…\nhttps://…'}
+                      value={form.gallery}
+                      onChange={(e) => set('gallery', e.target.value)}
+                    />
+                  </div>
+                  <div className="border-2 border-dashed rounded-xl p-8 text-center text-muted-foreground">
+                    <Upload className="w-8 h-8 mx-auto mb-2" />
+                    <p className="text-sm">File uploads arrive with the media phase — paste image URLs above for now.</p>
                   </div>
                 </div>
               )}
 
               {activeTab === 'specifications' && (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="grid grid-cols-3 gap-4 p-3 rounded-lg bg-muted/50">
-                      <Input placeholder="Key (e.g., Display)" />
-                      <Input className="col-span-2" placeholder="Value (e.g., 6.7-inch OLED)" />
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Specification
-                  </Button>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Specifications (JSON)</label>
+                  <textarea
+                    className="w-full min-h-[240px] rounded-lg border bg-background p-3 text-sm font-mono"
+                    placeholder={'{\n  "Display": { "Size": "6.7 inches" }\n}'}
+                    value={form.specifications}
+                    onChange={(e) => set('specifications', e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Grouped key/value specs, e.g. {'{ "Display": { "Size": "6.7″" } }'}.
+                  </p>
                 </div>
               )}
 
@@ -682,20 +775,16 @@ function ProductEditor({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Current Price</label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        defaultValue={product?.price}
-                      />
+                      <Input type="number" placeholder="0" value={form.currentPrice} onChange={(e) => set('currentPrice', e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Original Price</label>
-                      <Input type="number" placeholder="0" />
+                      <Input type="number" placeholder="0" value={form.originalPrice} onChange={(e) => set('originalPrice', e.target.value)} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Discount Percentage</label>
-                    <Input type="number" placeholder="0" />
+                    <Input type="number" placeholder="0" value={form.discountPercent} onChange={(e) => set('discountPercent', e.target.value)} />
                   </div>
                 </>
               )}
@@ -704,46 +793,38 @@ function ProductEditor({
                 <>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Meta Title</label>
-                    <Input placeholder="Page title for search engines" />
+                    <Input placeholder="Page title for search engines" value={form.seoTitle} onChange={(e) => set('seoTitle', e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Meta Description</label>
                     <textarea
                       className="w-full min-h-[100px] rounded-lg border bg-background p-3 text-sm"
                       placeholder="Brief description for search engines"
+                      value={form.metaDescription}
+                      onChange={(e) => set('metaDescription', e.target.value)}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Keywords</label>
-                    <Input placeholder="keyword1, keyword2, keyword3" />
                   </div>
                 </>
               )}
 
               {activeTab === 'affiliate' && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Amazon Affiliate URL</label>
-                    <Input placeholder="https://amazon.in/dp/..." />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Flipkart Affiliate URL</label>
-                    <Input placeholder="https://flipkart.com/..." />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Reliance Digital URL</label>
-                    <Input placeholder="https://reliancedigital.in/..." />
-                  </div>
-                </>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Amazon Affiliate URL</label>
+                  <Input placeholder="https://amazon.in/dp/..." value={form.affiliateUrl} onChange={(e) => set('affiliateUrl', e.target.value)} />
+                </div>
               )}
+
+              {error && <p className="text-sm text-red-600">{error}</p>}
             </div>
 
             {/* Actions */}
             <div className="sticky bottom-0 flex items-center justify-end gap-3 p-4 border-t bg-background">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={onClose} disabled={saving}>
                 Cancel
               </Button>
-              <Button className="bg-brand-gradient">Save Product</Button>
+              <Button className="bg-brand-gradient" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save Product'}
+              </Button>
             </div>
           </motion.div>
         </>

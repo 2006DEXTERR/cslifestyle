@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, AlertCircle, CheckCircle2, AlertTriangle, XCircle, Globe, FileText, Link, TrendingUp, Activity, RefreshCw, Download, Filter, Eye, ExternalLink, ChevronDown, ChevronRight, MoreHorizontal, Plus, Settings, Zap, Calendar, Clock, BarChart3, Layers } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
+import { formatNumber } from '@/lib/format';
 
 const indexedPagesData = [
   { date: 'Jun 1', indexed: 2450, submitted: 2500 }, { date: 'Jun 2', indexed: 2475, submitted: 2510 },
@@ -167,7 +168,7 @@ export default function SEOCenterPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{page.url}</p>
-                        <p className="text-xs text-muted-foreground">{page.impressions.toLocaleString()} impr. • {page.clicks.toLocaleString()} clicks</p>
+                        <p className="text-xs text-muted-foreground">{formatNumber(page.impressions)} impr. • {formatNumber(page.clicks)} clicks</p>
                       </div>
                     </div>
                   ))}

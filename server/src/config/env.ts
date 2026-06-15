@@ -58,6 +58,59 @@ const EnvSchema = z
       .default('false')
       .transform((v) => v === 'true'),
 
+    // Background-job driver. 'inline' processes import jobs in-process (no Redis —
+    // used in dev/test/CI). 'bullmq' enqueues to Redis-backed BullMQ queues +
+    // requires the worker process (`npm run worker`). See ADR-023.
+    QUEUE_DRIVER: z.enum(['inline', 'bullmq']).default('inline'),
+
+    // AI content engine (Phase 7, spec §10). The provider abstraction calls Claude
+    // (primary) → OpenAI (fallback) → Gemini. AI_DRIVER='mock' (default) generates
+    // deterministic content with no external API + zero cost — used in dev/test/CI;
+    // 'live' calls the real providers (keys below required). AI_CONCURRENCY = worker
+    // concurrency (FR-051, default 4). Provider keys live in env or encrypted Settings.
+    AI_DRIVER: z.enum(['mock', 'live']).default('mock'),
+    AI_PRIMARY_PROVIDER: z.enum(['anthropic', 'openai', 'gemini']).default('anthropic'),
+    AI_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
+    ANTHROPIC_API_KEY: z.string().optional(),
+    ANTHROPIC_MODEL: z.string().default('claude-3-5-sonnet-latest'),
+    OPENAI_API_KEY: z.string().optional(),
+    OPENAI_MODEL: z.string().default('gpt-4o'),
+    GOOGLE_AI_API_KEY: z.string().optional(),
+    GOOGLE_AI_MODEL: z.string().default('gemini-1.5-pro'),
+
+    // Analytics & reporting (Phase 8, spec §13). ANALYTICS_DRIVER='mock' (default) keeps
+    // all external adapters (PostHog / GA4 / Search Console) offline + no-op — used in
+    // dev/test/CI; 'live' forwards events to whichever providers have credentials. First-
+    // party analytics (DB aggregates) work regardless of driver. ANALYTICS_RETENTION_DAYS
+    // bounds the raw page-view/event tables (cleanup worker). Revenue estimate inputs
+    // (clicks × CVR × commission, §13.4) are configurable.
+    ANALYTICS_DRIVER: z.enum(['mock', 'live']).default('mock'),
+    ANALYTICS_RETENTION_DAYS: z.coerce.number().int().min(7).max(3650).default(180),
+    REVENUE_DEFAULT_CVR: z.coerce.number().min(0).max(1).default(0.04),
+    REVENUE_DEFAULT_COMMISSION: z.coerce.number().min(0).max(1).default(0.05),
+    POSTHOG_API_KEY: z.string().optional(),
+    POSTHOG_HOST: z.string().default('https://app.posthog.com'),
+    GA4_MEASUREMENT_ID: z.string().optional(),
+    GA4_API_SECRET: z.string().optional(),
+    GSC_SITE_URL: z.string().optional(),
+
+    // Marketing & communication (Phase 9). Reuses the existing email provider (Resend
+    // → console fallback, ADR-015) — no keys needed offline. NEWSLETTER_DOUBLE_OPT_IN
+    // gates the confirm-email step (FR — double opt-in). MARKETING_FROM_NAME brands sends.
+    NEWSLETTER_DOUBLE_OPT_IN: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    MARKETING_FROM_NAME: z.string().default('CSLifestyle'),
+    CAMPAIGN_BATCH_SIZE: z.coerce.number().int().min(1).max(1000).default(100),
+
+    // Media Library (Phase 10). Files are stored on disk under UPLOAD_DIR and served at
+    // `/uploads` (MEDIA_BASE_URL prefixes the public URL — same-origin by default).
+    // sharp generates thumbnail/webp/responsive variants. No external object store needed.
+    UPLOAD_DIR: z.string().default('uploads'),
+    MEDIA_BASE_URL: z.string().default(''), // '' → same-origin /uploads
+    MEDIA_MAX_FILE_MB: z.coerce.number().int().min(1).max(50).default(10),
+
     // Cookies
     COOKIE_SECURE: z
       .enum(['true', 'false'])

@@ -5,23 +5,37 @@ import { ThemeProvider } from '@/components/providers/theme-provider';
 import { Navbar } from '@/components/layout/Navbar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { Footer } from '@/components/layout/Footer';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { SITE, organizationJsonLd, websiteJsonLd } from '@/lib/seo';
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
 });
 
+const DEFAULT_TITLE = 'CSLifestyle - Find The Best Products Before You Buy';
+
 export const metadata: Metadata = {
-  title: 'CSLifestyle - Find The Best Products Before You Buy',
-  description: 'India\'s most trusted product discovery platform. Expert buying guides, comparisons, and reviews for smartphones, laptops, earbuds, and more.',
+  metadataBase: new URL(SITE.url),
+  title: {
+    default: DEFAULT_TITLE,
+    template: '%s | CSLifestyle',
+  },
+  description: SITE.description,
+  applicationName: SITE.name,
   openGraph: {
-    title: 'CSLifestyle - Find The Best Products Before You Buy',
-    description: 'India\'s most trusted product discovery platform.',
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
+    type: 'website',
+    siteName: SITE.name,
+    url: SITE.url,
+    title: DEFAULT_TITLE,
+    description: SITE.description,
+    images: [{ url: SITE.defaultImage }],
   },
   twitter: {
     card: 'summary_large_image',
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
+    title: DEFAULT_TITLE,
+    description: SITE.description,
+    images: [{ url: SITE.defaultImage }],
   },
 };
 
@@ -33,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased min-h-screen bg-background`}>
+        <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

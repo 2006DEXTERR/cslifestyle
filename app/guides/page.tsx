@@ -5,10 +5,36 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { BookOpen, Clock, ChevronRight } from 'lucide-react';
 import { GuideCard } from '@/components/guides/GuideCard';
-import { buyingGuides, categories } from '@/lib/data';
+import { contentApi, type ContentGuide } from '@/lib/api/content';
+import { catalogApi, type CatalogCategory } from '@/lib/api/catalog';
 
 export default function GuidesPage() {
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
+  const [buyingGuides, setBuyingGuides] = React.useState<ContentGuide[]>([]);
+  const [categories, setCategories] = React.useState<CatalogCategory[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    contentApi
+      .listGuides({ perPage: 100 })
+      .then((r) => {
+        if (active) setBuyingGuides(r.items);
+      })
+      .catch(() => {
+        if (active) setBuyingGuides([]);
+      });
+    catalogApi
+      .listCategories()
+      .then((data) => {
+        if (active) setCategories(data);
+      })
+      .catch(() => {
+        if (active) setCategories([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredGuides = selectedCategory
     ? buyingGuides.filter((g) => g.categorySlug === selectedCategory)

@@ -31,6 +31,7 @@ import {
   Globe,
   BarChart3,
   Mail,
+  ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,8 @@ const sidebarSections = [
       { name: 'SEO Center', href: '/admin/seo', icon: Globe },
       { name: 'Marketing', href: '/admin/marketing', icon: Mail },
       { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+      { name: 'Media Library', href: '/admin/media', icon: ImageIcon },
+      { name: 'Discovery', href: '/admin/search', icon: Search },
     ],
   },
   {

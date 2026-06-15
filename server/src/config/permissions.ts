@@ -44,6 +44,9 @@ const MODULES_CRUD = [
   'affiliate',
   'analytics',
   'import',
+  'reports',
+  'marketing',
+  'media',
 ] as const;
 
 const CRUD = ['view', 'create', 'edit', 'delete'] as const;
@@ -56,7 +59,19 @@ function buildPermissions(): PermissionDef[] {
     { name: 'guides.publish', module: 'guides', description: 'Publish guides' },
     { name: 'comparisons.publish', module: 'comparisons', description: 'Publish comparisons' },
     { name: 'ai.generate', module: 'ai', description: 'Trigger AI content generation' },
+    { name: 'ai.manage', module: 'ai', description: 'Manage AI queue (retry/approve), prompts, providers' },
     { name: 'seo.manage', module: 'seo', description: 'Manage sitemaps, robots, redirects' },
+    { name: 'import.manage', module: 'import', description: 'Manage import jobs, templates, retries' },
+    { name: 'analytics.manage', module: 'analytics', description: 'Manage analytics config + providers' },
+    { name: 'reports.manage', module: 'reports', description: 'Generate, manage and delete reports' },
+    { name: 'marketing.manage', module: 'marketing', description: 'Manage marketing center, settings' },
+    { name: 'newsletter.manage', module: 'marketing', description: 'Manage newsletter subscribers' },
+    { name: 'campaign.manage', module: 'marketing', description: 'Create, schedule and send campaigns' },
+    { name: 'media.upload', module: 'media', description: 'Upload media assets' },
+    { name: 'media.manage', module: 'media', description: 'Manage media (replace, delete, folders, usage)' },
+    { name: 'search.manage', module: 'search', description: 'Manage search synonyms + index' },
+    { name: 'recommendations.view', module: 'recommendations', description: 'View recommendation rules, internal-link suggestions' },
+    { name: 'recommendations.manage', module: 'recommendations', description: 'Manage recommendation rules, internal links' },
   ];
   for (const m of MODULES_CRUD) {
     for (const a of CRUD) {
@@ -92,9 +107,25 @@ const EDITOR_PERMS = [
   'seo.manage',
   'ai.view',
   'ai.generate',
+  'ai.manage',
   'affiliate.view',
   'analytics.view',
+  'analytics.manage',
+  'reports.view',
+  'reports.create',
+  'reports.manage',
   'import.view',
+  'import.create',
+  'marketing.view',
+  'marketing.manage',
+  'newsletter.manage',
+  'campaign.manage',
+  'media.view',
+  'media.upload',
+  'media.manage',
+  'search.manage',
+  'recommendations.view',
+  'recommendations.manage',
 ];
 
 const ANALYST_PERMS = [
@@ -106,8 +137,12 @@ const ANALYST_PERMS = [
   'comparisons.view',
   'authors.view',
   'analytics.view',
+  'reports.view',
   'affiliate.view',
   'seo.view',
+  'marketing.view',
+  'media.view',
+  'recommendations.view',
 ];
 
 const AUTHOR_PERMS = [
@@ -123,6 +158,8 @@ const AUTHOR_PERMS = [
   'comparisons.edit',
   'authors.view',
   'authors.edit',
+  'media.view',
+  'media.upload',
 ];
 
 /** Role → permission names. `admin` gets every permission. `user` gets none. */

@@ -40,6 +40,7 @@ import {
   getEditorsPicks,
   getDeals,
 } from '@/lib/data';
+import { formatNumber } from '@/lib/format';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -562,10 +563,10 @@ export default function Home() {
                 </div>
                 <div className="mt-auto flex items-center justify-between">
                   <div>
-                    <span className="text-lg font-bold text-foreground">₹{product.currentPrice.toLocaleString()}</span>
+                    <span className="text-lg font-bold text-foreground">₹{formatNumber(product.currentPrice)}</span>
                     {product.originalPrice && (
                       <span className="ml-2 text-sm text-muted-foreground line-through">
-                        ₹{product.originalPrice.toLocaleString()}
+                        ₹{formatNumber(product.originalPrice)}
                       </span>
                     )}
                   </div>

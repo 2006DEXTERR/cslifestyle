@@ -4,9 +4,26 @@ import * as React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ChevronRight, BookOpen } from 'lucide-react';
-import { authors } from '@/lib/data';
+import { contentApi, type ContentAuthor } from '@/lib/api/content';
 
 export default function AuthorsPage() {
+  const [authors, setAuthors] = React.useState<ContentAuthor[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    contentApi
+      .listAuthors({ perPage: 100 })
+      .then((r) => {
+        if (active) setAuthors(r.items);
+      })
+      .catch(() => {
+        if (active) setAuthors([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <section className="py-12 bg-muted/30 border-b">

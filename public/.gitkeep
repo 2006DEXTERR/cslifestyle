@@ -1,0 +1,1 @@
+# Static assets served at the site root. Dynamic robots.txt/sitemap.xml come from app/robots.ts + app/sitemap.ts.

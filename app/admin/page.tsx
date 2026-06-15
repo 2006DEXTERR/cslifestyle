@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { formatNumber } from '@/lib/format';
 import {
   Package,
   FolderTree,
@@ -402,7 +403,7 @@ export default function AdminDashboard() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{guide.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    by {guide.author} • {guide.views > 0 ? `${guide.views.toLocaleString()} views` : 'Draft'}
+                    by {guide.author} • {guide.views > 0 ? `${formatNumber(guide.views)} views` : 'Draft'}
                   </p>
                 </div>
                 <span

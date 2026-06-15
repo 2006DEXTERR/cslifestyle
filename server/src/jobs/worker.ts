@@ -1,6 +1,13 @@
 import { Worker, type Job } from 'bullmq';
 import { redis, connectRedis } from '../lib/redis';
 import { logger } from '../lib/logger';
+import { startCsvImportWorker } from '../queues/csv-import.worker';
+import { startAsinImportWorker } from '../queues/asin-import.worker';
+import { startCategoryImportWorker } from '../queues/category-import.worker';
+import { startAiGenerationWorker } from '../queues/ai-generation.worker';
+import { startAnalyticsWorker } from '../queues/analytics.worker';
+import { startMarketingWorker } from '../queues/marketing.worker';
+import { startDiscoveryWorker } from '../queues/discovery.worker';
 
 /**
  * BullMQ worker process (run separately from the web process, e.g.
@@ -24,9 +31,31 @@ async function main(): Promise<void> {
   worker.on('completed', (job) => logger.debug({ jobId: job.id }, 'Job completed'));
   worker.on('failed', (job, err) => logger.error({ jobId: job?.id, err }, 'Job failed'));
 
+  // Import Center workers (Phase 6).
+  const importWorkers = [startCsvImportWorker(), startAsinImportWorker(), startCategoryImportWorker()];
+
+  // AI content engine worker (Phase 7).
+  const aiWorkers = [startAiGenerationWorker()];
+
+  // Analytics & reporting worker (Phase 8).
+  const analyticsWorkers = [startAnalyticsWorker()];
+
+  // Marketing & communication worker (Phase 9).
+  const marketingWorkers = [startMarketingWorker()];
+
+  // Discovery worker (Phase 11: search index / recs / internal links).
+  const discoveryWorkers = [startDiscoveryWorker()];
+
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'Worker shutting down…');
-    await worker.close();
+    await Promise.all([
+      worker.close(),
+      ...importWorkers.map((w) => w.close()),
+      ...aiWorkers.map((w) => w.close()),
+      ...analyticsWorkers.map((w) => w.close()),
+      ...marketingWorkers.map((w) => w.close()),
+      ...discoveryWorkers.map((w) => w.close()),
+    ]);
     await redis.quit();
     process.exit(0);
   };

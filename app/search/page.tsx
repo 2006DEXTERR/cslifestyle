@@ -9,8 +9,9 @@ import { ProductCard } from '@/components/products/ProductCard';
 import { GuideCard } from '@/components/guides/GuideCard';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { products, buyingGuides, comparisons, brands } from '@/lib/data';
+import { discoveryApi } from '@/lib/api/discovery';
 
-const trendingSearches = [
+const defaultTrendingSearches = [
   'iPhone 15 Pro',
   'Samsung S24',
   'Best wireless earbuds',
@@ -26,6 +27,12 @@ const recentSearches = [
 ];
 
 export default function SearchPage() {
+  // Real trending terms (Phase 11), with a static fallback so the chips never empty.
+  const [trendingSearches, setTrendingSearches] = React.useState<string[]>(defaultTrendingSearches);
+  React.useEffect(() => {
+    discoveryApi.trending().then((t) => { if (t.length) setTrendingSearches(t); }).catch(() => undefined);
+  }, []);
+
   const [query, setQuery] = React.useState('');
   const [activeTab, setActiveTab] = React.useState<'all' | 'products' | 'guides' | 'comparisons' | 'brands'>('all');
   const [isSearching, setIsSearching] = React.useState(false);

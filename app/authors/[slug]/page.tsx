@@ -1,217 +1,44 @@
-'use client';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { AuthorDetail } from './author-detail';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { buildMetadata, breadcrumbJsonLd } from '@/lib/seo';
+import { getAuthor, listAuthorSlugs, listComparisons } from '@/lib/api/ssr';
 
-import * as React from 'react';
-import { use } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Twitter, Linkedin, Globe, Mail, ChevronRight, BookOpen, GitCompare, Heart } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { GuideCard } from '@/components/guides/GuideCard';
-import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
-import { authors, buyingGuides, comparisons } from '@/lib/data';
+export const revalidate = 3600; // ISR
 
-export default function AuthorPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
-  const author = authors.find((a) => a.slug === slug);
-  const [activeTab, setActiveTab] = React.useState<'guides' | 'comparisons' | 'activity'>('guides');
+export async function generateStaticParams() {
+  return (await listAuthorSlugs()).map((slug) => ({ slug }));
+}
 
-  if (!author) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">Author Not Found</h1>
-        <p className="text-muted-foreground">The author you're looking for doesn't exist.</p>
-      </div>
-    );
-  }
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const author = await getAuthor(params.slug);
+  if (!author) return { title: 'Author Not Found' };
+  return buildMetadata({
+    title: author.seoTitle || `${author.name} — Author at CSLifestyle`,
+    description: author.metaDescription || author.bio,
+    path: `/authors/${author.slug}`,
+    image: author.avatarUrl || undefined,
+    type: 'profile',
+  });
+}
 
-  const authorGuides = buyingGuides.filter((g) => g.author.slug === author.slug);
-  const authorComparisons = comparisons.slice(0, 3);
+export default async function AuthorPage({ params }: { params: { slug: string } }) {
+  const author = await getAuthor(params.slug);
+  if (!author) notFound();
 
-  const totalArticles = authorGuides.length + authorComparisons.length;
-  const totalViews = Math.floor(Math.random() * 500000) + 100000;
+  const authorComparisons = await listComparisons(3);
 
   return (
-    <div className="min-h-screen">
-      {/* Breadcrumb */}
-      <div className="bg-muted/30 border-b">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <a href="/" className="hover:text-foreground">Home</a>
-            <ChevronRight className="w-4 h-4" />
-            <span>{author.name}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Author Hero */}
-      <section className="py-12">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row gap-6 items-start">
-            <div className="relative">
-              <img
-                src={author.avatar}
-                alt={author.name}
-                className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover"
-              />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold mb-3">{author.name}</h1>
-              <p className="text-muted-foreground max-w-2xl mb-4">{author.bio}</p>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                {author.expertise.map((exp) => (
-                  <span
-                    key={exp}
-                    className="px-3 py-1 rounded-full bg-muted text-sm"
-                  >
-                    {exp}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap gap-4">
-                {author.social.twitter && (
-                  <a
-                    href={`https://twitter.com/${author.social.twitter}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <Twitter className="w-5 h-5" />
-                  </a>
-                )}
-                {author.social.linkedin && (
-                  <a
-                    href={`https://linkedin.com/in/${author.social.linkedin}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <Linkedin className="w-5 h-5" />
-                  </a>
-                )}
-                {author.social.website && (
-                  <a
-                    href={author.social.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <Globe className="w-5 h-5" />
-                  </a>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-6 mt-6 p-4 rounded-xl bg-muted/50">
-                <div className="text-center">
-                  <div className="text-2xl font-bold brand-gradient-text">{author.articlesCount}</div>
-                  <div className="text-sm text-muted-foreground">Articles</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold brand-gradient-text">{(totalViews / 1000).toFixed(0)}K</div>
-                  <div className="text-sm text-muted-foreground">Views</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold brand-gradient-text">{author.expertise.length}</div>
-                  <div className="text-sm text-muted-foreground">Topics</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Tabs */}
-      <section className="py-8 border-t">
-        <div className="container mx-auto px-4">
-          <div className="flex gap-1 mb-8 p-1 rounded-lg bg-muted overflow-x-auto">
-            {[
-              { id: 'guides', label: 'Buying Guides', icon: BookOpen },
-              { id: 'comparisons', label: 'Comparisons', icon: GitCompare },
-              { id: 'activity', label: 'Activity', icon: Heart },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content */}
-          {activeTab === 'guides' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              {authorGuides.length > 0 ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {authorGuides.map((guide) => (
-                    <GuideCard key={guide.id} guide={guide} variant="feature" />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  No buying guides from this author yet.
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {activeTab === 'comparisons' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {authorComparisons.map((comparison) => (
-                  <ComparisonCard key={comparison.id} comparison={comparison} />
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'activity' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="space-y-4">
-                {authorGuides.slice(0, 5).map((guide) => (
-                  <div
-                    key={guide.id}
-                    className="flex items-center gap-4 p-4 rounded-xl border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted">
-                      <img
-                        src={guide.coverImage}
-                        alt={guide.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium">{guide.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Published {guide.lastUpdated}
-                      </p>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {guide.readingTime} min read
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </section>
-    </div>
+    <>
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: 'Home', path: '/' },
+          { name: 'Authors', path: '/authors' },
+          { name: author.name, path: `/authors/${author.slug}` },
+        ])}
+      />
+      <AuthorDetail author={author} authorComparisons={authorComparisons} />
+    </>
   );
 }

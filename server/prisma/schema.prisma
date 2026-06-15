@@ -18,13 +18,13 @@ datasource db {
 // ───────────────────────── Identity & Access ─────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   name          String
-  email         String   @unique
-  passwordHash  String   @map("password_hash")
+  email         String  @unique
+  passwordHash  String  @map("password_hash")
   avatar        String?
-  isActive      Boolean  @default(true) @map("is_active")
-  emailVerified Boolean  @default(false) @map("email_verified")
+  isActive      Boolean @default(true) @map("is_active")
+  emailVerified Boolean @default(false) @map("email_verified")
 
   // Two-factor (TOTP). `twoFactorSecret` is AES-256-GCM encrypted at rest.
   twoFactorEnabled    Boolean   @default(false) @map("two_factor_enabled")
@@ -35,11 +35,19 @@ model User {
   roleId String @map("role_id")
   role   Role   @relation(fields: [roleId], references: [id])
 
-  sessions           Session[]
-  refreshTokens      RefreshToken[]
-  verificationTokens VerificationToken[]
-  backupCodes        TwoFactorBackupCode[]
-  auditLogs          AuditLog[]
+  sessions            Session[]
+  refreshTokens       RefreshToken[]
+  verificationTokens  VerificationToken[]
+  backupCodes         TwoFactorBackupCode[]
+  auditLogs           AuditLog[]
+  revenueImports      RevenueImport[]
+  importJobs          ImportJob[]
+  importTemplates     ImportTemplate[]
+  analyticsEvents     AnalyticsEvent[]
+  reportSnapshots     ReportSnapshot[]
+  campaigns           Campaign[]
+  mediaAssets         MediaAsset[]
+  recommendationRules RecommendationRule[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -176,6 +184,1035 @@ model TwoFactorBackupCode {
   @@index([userId])
   @@index([codeHash])
   @@map("two_factor_backup_codes")
+}
+
+// ───────────────────────── Catalog (Phase 2: products, categories, brands) ─────────────────────────
+//
+// ID strategy: catalog entities use cuid() string IDs (not the BigInt autoincrement
+// sketched in 06-database-design.md §1). Rationale — JSON-safe serialisation (BigInt
+// is not natively JSON-serialisable), parity with the existing auth entities, and the
+// frontend `lib/types.ts` already models `id` as a string. See ADR-017.
+//
+// The DB is the canonical (normalised) shape; the public API maps rows to the existing
+// frontend `Product`/`Category`/`Brand` shapes (presenters) so components stay untouched.
+
+model Category {
+  id              String     @id @default(cuid())
+  parentId        String?    @map("parent_id")
+  parent          Category?  @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Category[] @relation("CategoryChildren")
+  name            String
+  slug            String     @unique
+  description     String?    @db.Text
+  image           String?
+  icon            String? // lucide icon name (e.g. "Smartphone")
+  seoTitle        String?    @map("seo_title")
+  metaDescription String?    @map("meta_description")
+  // Display labels (string[]) for the existing UI chips — preserves the current
+  // frontend `Category.subcategories` without forcing a full sub-category hierarchy.
+  subcategories   Json?
+  isActive        Boolean    @default(true) @map("is_active")
+  sortOrder       Int        @default(0) @map("sort_order")
+
+  products    Product[]
+  guides      Guide[]
+  importItems ImportItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([parentId])
+  @@index([slug])
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+model Brand {
+  id              String  @id @default(cuid())
+  name            String
+  slug            String  @unique
+  logo            String?
+  description     String? @db.Text
+  website         String?
+  seoTitle        String? @map("seo_title")
+  metaDescription String? @map("meta_description")
+  // Average display rating (UI preservation — existing brand cards show a rating).
+  rating          Float   @default(0)
+  isActive        Boolean @default(true) @map("is_active")
+
+  products Product[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("brands")
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  asin             String   @unique // §4.6 ASIN uniqueness
+  categoryId       String   @map("category_id")
+  category         Category @relation(fields: [categoryId], references: [id])
+  brandId          String?  @map("brand_id")
+  brand            Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  title            String
+  slug             String   @unique
+  shortDescription String?  @map("short_description")
+  description      String?  @db.Text
+
+  image          String? // primary image URL
+  gallery        Json? // string[] of additional image URLs (authoring convenience)
+  specifications Json? // Record<string, Record<string,string>>
+  highlights     Json? // string[]   — UI preservation
+  features       Json? // Record<string,string> — UI preservation
+  pros           Json? // string[]
+  cons           Json? // string[]
+  faqs           Json? // { question, answer }[]
+
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0) @map("review_count")
+  currentPrice    Decimal? @map("current_price") @db.Decimal(12, 2)
+  originalPrice   Decimal? @map("original_price") @db.Decimal(12, 2)
+  discountPercent Int?     @map("discount_percent")
+  currency        String   @default("INR")
+  availability    String   @default("In Stock") // In Stock | Limited Stock | Out of Stock | Pre-order
+  affiliateUrl    String?  @map("affiliate_url")
+
+  seoTitle        String? @map("seo_title")
+  metaDescription String? @map("meta_description")
+
+  isPublished   Boolean @default(false) @map("is_published")
+  isTrending    Boolean @default(false) @map("is_trending") // frontend `trending`
+  isEditorsPick Boolean @default(false) @map("is_editors_pick") // frontend `editorsPick`
+
+  // AI content engine (Phase 7): generation state + review gate (06 §7.9, §4.6).
+  aiStatus      AiContentStatus @default(pending) @map("ai_status")
+  aiGeneratedAt DateTime?       @map("ai_generated_at")
+  // Optional active deal (frontend `deal: { expiresIn, savings }`).
+  dealExpiresIn String?         @map("deal_expires_in")
+  dealSavings   Int?            @map("deal_savings")
+
+  images       ProductImage[]
+  priceHistory ProductPriceHistory[]
+
+  // Content relations (Phase 3)
+  guideProducts      GuideProduct[]
+  comparisonProducts ComparisonProduct[]
+  comparisonsAsA     Comparison[]        @relation("ComparisonProductA")
+  comparisonsAsB     Comparison[]        @relation("ComparisonProductB")
+
+  // Affiliate / revenue relations (Phase 5)
+  affiliateClicks AffiliateClick[]
+  revenueReports  RevenueReport[]
+
+  // Import relations (Phase 6)
+  importItems ImportItem[]
+
+  // Analytics relations (Phase 8)
+  productViews ProductView[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([slug])
+  @@index([asin])
+  @@index([isPublished, categoryId])
+  @@index([isPublished, isTrending])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  imageUrl  String   @map("image_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model ProductPriceHistory {
+  id            String   @id @default(cuid())
+  productId     String   @map("product_id")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price         Decimal  @db.Decimal(12, 2)
+  originalPrice Decimal? @map("original_price") @db.Decimal(12, 2)
+  checkedAt     DateTime @default(now()) @map("checked_at")
+
+  @@index([productId, checkedAt])
+  @@map("product_price_history")
+}
+
+// ───────────────────────── Search query log (FR-032) ─────────────────────────
+
+model SearchQuery {
+  id           String   @id @default(cuid())
+  query        String
+  type         String? // products | categories | brands | all
+  resultsCount Int      @default(0) @map("results_count")
+  ipHash       String?  @map("ip_hash") // SHA-256 only — NFR-SEC-007
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([query])
+  @@index([createdAt])
+  @@map("search_queries")
+}
+
+// ───────────────────────── Content (Phase 3: guides, comparisons, authors) ─────────────────────────
+//
+// Same conventions as the catalog (ADR-017/018): cuid string IDs; the public API maps rows to the
+// existing frontend `BuyingGuide`/`Comparison`/`Author` shapes via presenters. A few UI-preservation
+// columns extend the Phase-3 spec schema (Guide.tags; GuideProduct.reason/isTopPick; Comparison.
+// summary/prosCons; ComparisonSpec.details) so the existing UI renders unchanged — see ADR-020.
+
+enum ContentStatus {
+  draft
+  published
+}
+
+model Author {
+  id              String  @id @default(cuid())
+  slug            String  @unique
+  name            String
+  avatarUrl       String? @map("avatar_url")
+  bio             String? @db.Text
+  credentials     String? @db.Text
+  expertise       Json? // string[]
+  socialLinks     Json? // { twitter?, linkedin?, website? }
+  seoTitle        String? @map("seo_title")
+  metaDescription String? @map("meta_description")
+  isActive        Boolean @default(true) @map("is_active")
+
+  guides Guide[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("authors")
+}
+
+model Guide {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  title           String
+  excerpt         String?       @db.Text
+  content         String?       @db.Text
+  coverImage      String?       @map("cover_image")
+  categoryId      String?       @map("category_id")
+  category        Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  authorId        String?       @map("author_id")
+  author          Author?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  readingTime     Int?          @map("reading_time")
+  tableOfContents Json? // { title, id }[]
+  faqItems        Json? // { question, answer }[]
+  tags            Json? // string[] — UI preservation
+  seoTitle        String?       @map("seo_title")
+  metaDescription String?       @map("meta_description")
+  status          ContentStatus @default(draft)
+  publishedAt     DateTime?     @map("published_at")
+
+  products GuideProduct[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([status, publishedAt])
+  @@map("guides")
+}
+
+model GuideProduct {
+  guideId   String  @map("guide_id")
+  guide     Guide   @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position  Int     @default(0)
+  // UI preservation — the existing guide page shows a reason + "Top Pick" badge per recommendation.
+  reason    String? @db.Text
+  isTopPick Boolean @default(false) @map("is_top_pick")
+
+  @@id([guideId, productId])
+  @@index([productId])
+  @@map("guide_products")
+}
+
+model Comparison {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  title           String
+  excerpt         String?       @db.Text
+  // UI preservation — the existing comparison page shows a `summary`, a per-product `prosCons`
+  // block, and a `verdict`. `prosCons` = { productA:{pros,cons}, productB:{pros,cons} }.
+  summary         String?       @db.Text
+  prosCons        Json?
+  productAId      String        @map("product_a_id")
+  productA        Product       @relation("ComparisonProductA", fields: [productAId], references: [id])
+  productBId      String        @map("product_b_id")
+  productB        Product       @relation("ComparisonProductB", fields: [productBId], references: [id])
+  verdict         String?       @db.Text
+  winner          String? // 'A' | 'B' | 'tie'
+  seoTitle        String?       @map("seo_title")
+  metaDescription String?       @map("meta_description")
+  status          ContentStatus @default(draft)
+  publishedAt     DateTime?     @map("published_at")
+
+  specs    ComparisonSpec[]
+  products ComparisonProduct[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@index([status, publishedAt])
+  @@index([productAId])
+  @@index([productBId])
+  @@map("comparisons")
+}
+
+model ComparisonSpec {
+  id            String     @id @default(cuid())
+  comparisonId  String     @map("comparison_id")
+  comparison    Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  specName      String     @map("spec_name")
+  productAValue String?    @map("product_a_value")
+  productBValue String?    @map("product_b_value")
+  winner        String? // 'A' | 'B' | 'tie'
+  details       String?    @db.Text // UI preservation — per-row description
+  position      Int        @default(0)
+
+  @@index([comparisonId])
+  @@map("comparison_specs")
+}
+
+model ComparisonProduct {
+  comparisonId String     @map("comparison_id")
+  comparison   Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  productId    String     @map("product_id")
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position     Int        @default(0)
+
+  @@id([comparisonId, productId])
+  @@index([productId])
+  @@map("comparison_products")
+}
+
+// ───────────────────────── Affiliate & Revenue (Phase 5) ─────────────────────────
+//
+// Privacy: clicks store only SHA-256 hashes of IP / user-agent (NFR-SEC-007); no raw PII.
+// The /go/{asin} redirect validates the amazon.in whitelist (NFR-SEC-008) and applies the
+// associate tag from AffiliateSettings (or a campaign override). See ADR-022.
+
+enum AffiliateSourceType {
+  product
+  guide
+  comparison
+  category
+  deals
+  search
+  direct
+  other
+}
+
+enum AffiliateDeviceType {
+  mobile
+  tablet
+  desktop
+  unknown
+}
+
+enum RevenueSource {
+  estimated
+  amazon_csv
+}
+
+enum ImportStatus {
+  pending
+  completed
+  failed
+}
+
+model AffiliateClick {
+  id            String              @id @default(cuid())
+  asin          String
+  productId     String?             @map("product_id")
+  product       Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sourceType    AffiliateSourceType @default(other) @map("source_type")
+  sourcePath    String?             @map("source_path")
+  campaignId    String?             @map("campaign_id")
+  campaign      AffiliateCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  affiliateTag  String?             @map("affiliate_tag")
+  ipHash        String?             @map("ip_hash") // SHA-256 only
+  userAgentHash String?             @map("user_agent_hash") // SHA-256 only
+  deviceType    AffiliateDeviceType @default(unknown) @map("device_type")
+  country       String?
+  clickedAt     DateTime            @default(now()) @map("clicked_at")
+
+  @@index([asin])
+  @@index([clickedAt])
+  @@index([productId])
+  @@index([sourceType])
+  @@index([campaignId])
+  @@map("affiliate_clicks")
+}
+
+model AffiliateCampaign {
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  affiliateTag String?          @map("affiliate_tag") // optional per-campaign associate tag
+  description  String?          @db.Text
+  isActive     Boolean          @default(true) @map("is_active")
+  startsAt     DateTime?        @map("starts_at")
+  endsAt       DateTime?        @map("ends_at")
+  clicks       AffiliateClick[]
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("affiliate_campaigns")
+}
+
+/// Singleton row (id = "default") holding global affiliate configuration.
+model AffiliateSettings {
+  id                 String   @id @default("default")
+  amazonAssociateTag String   @default("cslifestyle-21") @map("amazon_associate_tag")
+  amazonDomain       String   @default("amazon.in") @map("amazon_domain")
+  linkCode           String   @default("ogi")
+  extraParams        Json? // additional query params merged into the redirect URL
+  disclosureText     String?  @map("disclosure_text") @db.Text
+  trackingEnabled    Boolean  @default(true) @map("tracking_enabled")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("affiliate_settings")
+}
+
+model RevenueImport {
+  id           String          @id @default(cuid())
+  fileName     String          @map("file_name")
+  source       RevenueSource   @default(amazon_csv)
+  status       ImportStatus    @default(pending)
+  rowCount     Int             @default(0) @map("row_count")
+  totalRevenue Decimal         @default(0) @map("total_revenue") @db.Decimal(14, 2)
+  periodStart  DateTime?       @map("period_start")
+  periodEnd    DateTime?       @map("period_end")
+  error        String?         @db.Text
+  importedById String?         @map("imported_by_id")
+  importedBy   User?           @relation(fields: [importedById], references: [id], onDelete: SetNull)
+  reports      RevenueReport[]
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@index([source])
+  @@index([createdAt])
+  @@map("revenue_imports")
+}
+
+model RevenueReport {
+  id               String         @id @default(cuid())
+  date             DateTime       @db.Date
+  asin             String?
+  productId        String?        @map("product_id")
+  product          Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  category         String?
+  actualRevenue    Decimal        @default(0) @map("actual_revenue") @db.Decimal(14, 2)
+  estimatedRevenue Decimal?       @map("estimated_revenue") @db.Decimal(14, 2)
+  orders           Int            @default(0)
+  clicks           Int            @default(0)
+  source           RevenueSource  @default(amazon_csv)
+  importId         String?        @map("import_id")
+  import           RevenueImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@index([date])
+  @@index([asin])
+  @@index([source])
+  @@index([importId])
+  @@map("revenue_reports")
+}
+
+// ───────────────────────── Import Center (Phase 6) ─────────────────────────
+//
+// Jobs are processed by the inline driver (dev/test) or BullMQ workers (prod) — see ADR-023.
+// ImportItem holds per-row outcome + errors for the import report. cuid IDs (ADR-017).
+
+enum ImportType {
+  csv_product
+  asin
+  category
+}
+
+enum ImportJobStatus {
+  pending
+  processing
+  completed
+  failed
+  cancelled
+}
+
+enum ImportItemStatus {
+  pending
+  success
+  failed
+  skipped
+  duplicate
+}
+
+enum DuplicateMode {
+  skip
+  overwrite
+  create_copy
+}
+
+model ImportJob {
+  id             String          @id @default(cuid())
+  type           ImportType
+  name           String?
+  status         ImportJobStatus @default(pending)
+  source         String // file name, 'asin-list', or 'category-list'
+  duplicateMode  DuplicateMode   @default(skip) @map("duplicate_mode")
+  totalItems     Int             @default(0) @map("total_items")
+  processedItems Int             @default(0) @map("processed_items")
+  successCount   Int             @default(0) @map("success_count")
+  failedCount    Int             @default(0) @map("failed_count")
+  skippedCount   Int             @default(0) @map("skipped_count")
+  startedAt      DateTime?       @map("started_at")
+  completedAt    DateTime?       @map("completed_at")
+  createdById    String?         @map("created_by_id")
+  createdBy      User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  metadata       Json?
+  report         Json?
+  error          String?         @db.Text
+
+  items ImportItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@map("import_jobs")
+}
+
+model ImportItem {
+  id                String           @id @default(cuid())
+  jobId             String           @map("job_id")
+  job               ImportJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  position          Int              @default(0)
+  externalId        String?          @map("external_id") // ASIN / category name / row key
+  status            ImportItemStatus @default(pending)
+  errors            Json? // string[]
+  rawData           Json?            @map("raw_data")
+  createdProductId  String?          @map("created_product_id")
+  createdProduct    Product?         @relation(fields: [createdProductId], references: [id], onDelete: SetNull)
+  createdCategoryId String?          @map("created_category_id")
+  createdCategory   Category?        @relation(fields: [createdCategoryId], references: [id], onDelete: SetNull)
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  @@index([jobId])
+  @@index([status])
+  @@index([externalId])
+  @@map("import_items")
+}
+
+model ImportTemplate {
+  id          String     @id @default(cuid())
+  name        String
+  type        ImportType
+  mappings    Json // column → field mapping
+  createdById String?    @map("created_by_id")
+  createdBy   User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("import_templates")
+}
+
+// ───────────────────────── AI content engine (Phase 7: spec §10, 06 §7.9) ─────────────────────────
+//
+// Queue-based AI generation (FR-050/051): Claude primary / OpenAI fallback / Gemini via a provider
+// abstraction. Operational queue is BullMQ/Redis (or the inline driver in dev/test, ADR-023); AiQueue
+// is the durable audit/admin view (FR-060). Generated content is stored on the queue row awaiting
+// review (`approved`) — the review gate blocks public indexing (FR-052, §4.6). AiLog records model/
+// prompt/response/tokens/cost/status with 30-day retention (FR-055). Entity refs are polymorphic
+// (entityType + entityId), matching the spec.
+
+enum AiEntityType {
+  product
+  guide
+  comparison
+  category
+  brand
+}
+
+enum AiJobType {
+  title
+  meta_description
+  description
+  pros
+  cons
+  faq
+  verdict
+  guide
+  category_description
+}
+
+enum AiQueueStatus {
+  pending
+  processing
+  done
+  failed
+}
+
+enum AiLogStatus {
+  success
+  failed
+}
+
+enum AiContentStatus {
+  pending
+  generating
+  done
+  failed
+}
+
+model AiQueue {
+  id             String        @id @default(cuid())
+  entityType     AiEntityType  @map("entity_type")
+  entityId       String        @map("entity_id")
+  jobType        AiJobType     @map("job_type")
+  promptTemplate String?       @map("prompt_template") @db.Text // resolved prompt type key
+  status         AiQueueStatus @default(pending)
+  priority       Int           @default(0)
+  attempts       Int           @default(0)
+  maxAttempts    Int           @default(3) @map("max_attempts")
+  result         Json? // generated content awaiting review (FR-052)
+  approved       Boolean       @default(false) // review gate (FR-052 / §4.6)
+  approvedAt     DateTime?     @map("approved_at")
+  errorMessage   String?       @map("error_message") @db.Text
+  createdAt      DateTime      @default(now()) @map("created_at")
+  startedAt      DateTime?     @map("started_at")
+  completedAt    DateTime?     @map("completed_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  logs AiLog[]
+
+  @@index([status, priority])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("ai_queue")
+}
+
+model AiLog {
+  id           String       @id @default(cuid())
+  queueId      String?      @map("queue_id")
+  queue        AiQueue?     @relation(fields: [queueId], references: [id], onDelete: SetNull)
+  entityType   AiEntityType @map("entity_type")
+  entityId     String       @map("entity_id")
+  jobType      AiJobType    @map("job_type")
+  modelUsed    String?      @map("model_used")
+  provider     String?
+  promptUsed   String?      @map("prompt_used") @db.Text
+  responseRaw  String?      @map("response_raw") @db.Text
+  tokensInput  Int?         @map("tokens_input")
+  tokensOutput Int?         @map("tokens_output")
+  costUsd      Decimal?     @map("cost_usd") @db.Decimal(10, 6)
+  status       AiLogStatus
+  errorMessage String?      @map("error_message") @db.Text
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([status])
+  @@map("ai_logs")
+}
+
+// ───────────────────────── Analytics & Reporting (Phase 8: spec §13) ─────────────────────────
+//
+// A real analytics engine over the existing event sources (AffiliateClick / AiLog / SearchQuery /
+// ImportJob / RevenueReport) plus new first-party view tracking. Privacy-safe: only SHA-256(ip) is
+// stored, never raw IPs (NFR-SEC-007) — reuses `lib/request-context`. AnalyticsEvent is the unified
+// event log; PageView/ProductView are specialised view tables for dashboard aggregates. ReportSnapshot
+// stores generated (daily/weekly/monthly) report payloads produced by the analytics workers.
+
+enum AnalyticsEventType {
+  page_view
+  product_view
+  guide_view
+  comparison_view
+  author_view
+  category_view
+  brand_view
+  search
+  affiliate_click
+  ai_generation
+  revenue_import
+  import_job
+  admin_action
+}
+
+model AnalyticsEvent {
+  id         String             @id @default(cuid())
+  eventType  AnalyticsEventType @map("event_type")
+  entityType String?            @map("entity_type") // product | guide | comparison | author | category | brand
+  entityId   String?            @map("entity_id")
+  sessionId  String?            @map("session_id")
+  userId     String?            @map("user_id")
+  user       User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipHash     String?            @map("ip_hash") // SHA-256 only — NFR-SEC-007
+  country    String?
+  device     String? // mobile | tablet | desktop | unknown
+  metadata   Json?
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@index([eventType, createdAt])
+  @@index([entityType, entityId])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("analytics_events")
+}
+
+model PageView {
+  id        String   @id @default(cuid())
+  url       String
+  referrer  String?
+  device    String? // mobile | tablet | desktop | unknown
+  country   String?
+  sessionId String?  @map("session_id")
+  ipHash    String?  @map("ip_hash") // SHA-256 only — NFR-SEC-007
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([url])
+  @@index([createdAt])
+  @@index([sessionId])
+  @@map("page_views")
+}
+
+model ProductView {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sessionId String?  @map("session_id")
+  country   String?
+  device    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([productId, createdAt])
+  @@index([createdAt])
+  @@map("product_views")
+}
+
+model ReportSnapshot {
+  id          String    @id @default(cuid())
+  type        String // daily | weekly | monthly | dashboard | custom
+  payload     Json
+  periodStart DateTime? @map("period_start")
+  periodEnd   DateTime? @map("period_end")
+  createdById String?   @map("created_by_id")
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([type, createdAt])
+  @@map("report_snapshots")
+}
+
+// ───────────────────────── Marketing & Communication (Phase 9) ─────────────────────────
+//
+// Newsletter + email campaigns (a feature beyond the base blueprint — see 03 audit). Reuses the
+// existing email provider abstraction (Resend → console fallback, ADR-015): no keys needed offline.
+// Double opt-in (NewsletterSubscriber.verifyTokenHash) + one-click unsubscribe (unsubscribeToken)
+// for CAN-SPAM-style compliance. Privacy: verification tokens are stored hashed (SHA-256).
+
+enum SubscriberStatus {
+  pending // awaiting double opt-in confirmation
+  active
+  unsubscribed
+  bounced
+  complained
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+  cancelled
+}
+
+enum CampaignRecipientStatus {
+  pending
+  sent
+  delivered
+  opened
+  clicked
+  failed
+  bounced
+  unsubscribed
+}
+
+enum EmailEventType {
+  queued
+  sent
+  delivered
+  opened
+  clicked
+  failed
+  bounced
+  unsubscribed
+  complained
+}
+
+model NewsletterSubscriber {
+  id               String           @id @default(cuid())
+  email            String           @unique
+  status           SubscriberStatus @default(pending)
+  source           String? // footer | homepage | admin | api | import
+  tags             Json? // string[]
+  verifyTokenHash  String?          @map("verify_token_hash") // SHA-256 of the double opt-in token
+  unsubscribeToken String           @unique @map("unsubscribe_token")
+  verifiedAt       DateTime?        @map("verified_at")
+  subscribedAt     DateTime         @default(now()) @map("subscribed_at")
+  unsubscribedAt   DateTime?        @map("unsubscribed_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  recipients CampaignRecipient[]
+
+  @@index([status])
+  @@index([email])
+  @@index([subscribedAt])
+  @@map("newsletter_subscribers")
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  name           String
+  subject        String
+  template       String         @default("newsletter") // newsletter | product_announcement | guide_announcement | comparison_announcement
+  content        String?        @db.Text // body (HTML/markdown-ish)
+  entityId       String?        @map("entity_id") // product/guide/comparison id for announcement templates
+  fromName       String?        @map("from_name")
+  segmentTag     String?        @map("segment_tag") // optional tag filter for the audience
+  status         CampaignStatus @default(draft)
+  scheduledAt    DateTime?      @map("scheduled_at")
+  sentAt         DateTime?      @map("sent_at")
+  recipientCount Int            @default(0) @map("recipient_count")
+  deliveredCount Int            @default(0) @map("delivered_count")
+  openedCount    Int            @default(0) @map("opened_count")
+  clickedCount   Int            @default(0) @map("clicked_count")
+  failedCount    Int            @default(0) @map("failed_count")
+  bouncedCount   Int            @default(0) @map("bounced_count")
+  createdById    String?        @map("created_by_id")
+  createdBy      User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  recipients CampaignRecipient[]
+  events     EmailEvent[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id           String                  @id @default(cuid())
+  campaignId   String                  @map("campaign_id")
+  campaign     Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subscriberId String                  @map("subscriber_id")
+  subscriber   NewsletterSubscriber    @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  status       CampaignRecipientStatus @default(pending)
+  error        String?                 @db.Text
+  deliveredAt  DateTime?               @map("delivered_at")
+  openedAt     DateTime?               @map("opened_at")
+  clickedAt    DateTime?               @map("clicked_at")
+  createdAt    DateTime                @default(now()) @map("created_at")
+
+  @@unique([campaignId, subscriberId])
+  @@index([campaignId])
+  @@index([status])
+  @@map("campaign_recipients")
+}
+
+model EmailEvent {
+  id           String         @id @default(cuid())
+  campaignId   String?        @map("campaign_id")
+  campaign     Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  recipientId  String?        @map("recipient_id")
+  subscriberId String?        @map("subscriber_id")
+  type         EmailEventType
+  metadata     Json?
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  @@index([campaignId, type])
+  @@index([type])
+  @@index([createdAt])
+  @@map("email_events")
+}
+
+// ───────────────────────── Media Library & Assets (Phase 10) ─────────────────────────
+//
+// Production media management (06 §7.10 `Media`, refined per ADR-027). MediaAsset is the stored asset
+// (hash-deduped; sharp generates thumbnail/webp/responsive variants + dimensions). MediaUsage is the
+// polymorphic link between an asset and the entity/field that references it (drives usage tracking +
+// unused-asset detection). MediaFolder gives an optional tree for organisation. Files live on disk
+// under UPLOAD_DIR (served at /uploads) — no external object store needed offline.
+
+model MediaFolder {
+  id        String        @id @default(cuid())
+  name      String
+  parentId  String?       @map("parent_id")
+  parent    MediaFolder?  @relation("MediaFolderTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  MediaFolder[] @relation("MediaFolderTree")
+  assets    MediaAsset[]
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@index([parentId])
+  @@map("media_folders")
+}
+
+model MediaAsset {
+  id           String       @id @default(cuid())
+  filename     String // stored filename (hash-based)
+  originalName String       @map("original_name")
+  mimeType     String       @map("mime_type")
+  size         Int // bytes
+  width        Int?
+  height       Int?
+  altText      String?      @map("alt_text")
+  caption      String?
+  storagePath  String       @map("storage_path") // relative path of the original under UPLOAD_DIR
+  variants     Json? // { thumbnail, webp, sizes: [{ w, path }] }
+  hash         String       @unique // SHA-256 of bytes (duplicate detection)
+  folderId     String?      @map("folder_id")
+  folder       MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdById  String?      @map("created_by_id")
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  usages MediaUsage[]
+
+  @@index([folderId])
+  @@index([mimeType])
+  @@index([createdAt])
+  @@map("media_assets")
+}
+
+model MediaUsage {
+  id         String     @id @default(cuid())
+  mediaId    String     @map("media_id")
+  media      MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  entityType String     @map("entity_type") // product | guide | comparison | category | brand | author | campaign
+  entityId   String     @map("entity_id")
+  field      String? // which field references it (image | gallery | cover | …)
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  @@unique([mediaId, entityType, entityId, field])
+  @@index([entityType, entityId])
+  @@index([mediaId])
+  @@map("media_usages")
+}
+
+// ───────────────────────── Discovery: Search, Recommendations, Internal Links (Phase 11) ─────────────────────────
+//
+// A unified search index (SearchIndexEntry) over all 6 entity types powers advanced search (weighted +
+// fuzzy + synonym-expanded). RecommendationRule makes the recommendation blend admin-configurable.
+// InternalLink stores *suggested* links for review (never auto-inserted into content). A discovery
+// worker refreshes the index, recomputes recommendations, generates link suggestions, and detects
+// broken internal links (spec §10 internal links / §11 search).
+
+enum SearchEntityType {
+  product
+  category
+  brand
+  guide
+  comparison
+  author
+}
+
+model SearchSynonym {
+  id        String   @id @default(cuid())
+  term      String   @unique
+  synonyms  Json // string[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("search_synonyms")
+}
+
+model SearchIndexEntry {
+  id         String           @id @default(cuid())
+  entityType SearchEntityType @map("entity_type")
+  entityId   String           @map("entity_id")
+  slug       String?
+  title      String
+  body       String?          @db.Text
+  keywords   String?          @db.Text // space-joined searchable keywords
+  boost      Float            @default(1) // relevance multiplier
+  url        String?
+  image      String?
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@unique([entityType, entityId])
+  @@index([entityType])
+  @@index([title])
+  @@map("search_index_entries")
+}
+
+model RecommendationRule {
+  id          String   @id @default(cuid())
+  name        String
+  type        String // related_products | similar | category | brand | price | trending | affiliate
+  conditions  Json? // arbitrary tuning conditions
+  weight      Float    @default(1)
+  isActive    Boolean  @default(true)
+  createdById String?  @map("created_by_id")
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([type, isActive])
+  @@map("recommendation_rules")
+}
+
+enum InternalLinkStatus {
+  suggested
+  approved
+  rejected
+  broken
+}
+
+model InternalLink {
+  id         String             @id @default(cuid())
+  sourceType String             @map("source_type")
+  sourceId   String             @map("source_id")
+  targetType String             @map("target_type")
+  targetId   String             @map("target_id")
+  anchorText String             @map("anchor_text")
+  targetUrl  String?            @map("target_url")
+  status     InternalLinkStatus @default(suggested)
+  score      Float              @default(0)
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@unique([sourceType, sourceId, targetType, targetId])
+  @@index([sourceType, sourceId])
+  @@index([status])
+  @@map("internal_links")
 }
 
 // ───────────────────────── Settings (admin-configurable) ─────────────────────────

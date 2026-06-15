@@ -4,9 +4,26 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
-import { comparisons } from '@/lib/data';
+import { contentApi, type ContentComparison } from '@/lib/api/content';
 
 export default function ComparisonsPage() {
+  const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    contentApi
+      .listComparisons({ perPage: 100 })
+      .then((r) => {
+        if (active) setComparisons(r.items);
+      })
+      .catch(() => {
+        if (active) setComparisons([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <section className="py-12 bg-muted/30 border-b">

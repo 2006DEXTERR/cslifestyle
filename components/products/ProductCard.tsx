@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Star, ExternalLink, Clock, TrendingUp, Award, Percent } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Product } from '@/lib/types';
+import { formatNumber } from '@/lib/format';
 
 interface ProductCardProps {
   product: Product;
@@ -28,7 +29,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
       <div className="flex items-center gap-1">
         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
         <span className="font-medium">{rating}</span>
-        <span className="text-muted-foreground text-sm">({product.reviewCount.toLocaleString()})</span>
+        <span className="text-muted-foreground text-sm">({formatNumber(product.reviewCount)})</span>
       </div>
     );
   };
@@ -183,7 +184,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
             <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
             <span className="text-sm font-medium">{product.rating}</span>
             <span className="text-xs text-muted-foreground">
-              ({product.reviewCount.toLocaleString()})
+              ({formatNumber(product.reviewCount)})
             </span>
           </div>
 

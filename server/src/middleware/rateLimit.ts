@@ -61,3 +61,27 @@ export const twoFactorLimiter = rateLimit({
   keyGenerator: (req) => req.ip ?? 'unknown',
   store: makeStore('2fa'),
 });
+
+/** Public catalog reads (products/categories/brands listings + detail). Generous. */
+export const publicCatalogLimiter = rateLimit({
+  ...common,
+  limit: 600,
+  keyGenerator: (req) => req.ip ?? 'unknown',
+  store: makeStore('catalog'),
+});
+
+/** Catalog search — tighter (logged + DB-backed). ~120/15m per IP. */
+export const searchLimiter = rateLimit({
+  ...common,
+  limit: 120,
+  keyGenerator: (req) => req.ip ?? 'unknown',
+  store: makeStore('search'),
+});
+
+/** Affiliate /go redirect — generous (high-traffic outbound clicks). ~900/15m per IP. */
+export const goLimiter = rateLimit({
+  ...common,
+  limit: 900,
+  keyGenerator: (req) => req.ip ?? 'unknown',
+  store: makeStore('go'),
+});

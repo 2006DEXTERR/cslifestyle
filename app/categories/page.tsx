@@ -3,9 +3,26 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
 import { CategoryCard } from '@/components/categories/CategoryCard';
-import { categories } from '@/lib/data';
+import { catalogApi, type CatalogCategory } from '@/lib/api/catalog';
 
 export default function CategoriesPage() {
+  const [categories, setCategories] = React.useState<CatalogCategory[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    catalogApi
+      .listCategories()
+      .then((data) => {
+        if (active) setCategories(data);
+      })
+      .catch(() => {
+        if (active) setCategories([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <section className="py-12 bg-muted/30 border-b">

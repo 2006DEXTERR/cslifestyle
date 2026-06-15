@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import {
   PERMISSIONS,
@@ -8,6 +9,16 @@ import {
   type RoleName,
 } from '../src/config/permissions';
 import { ENFORCE_2FA_ROLES_KEY } from '../src/services/settings.service';
+// Reuse the existing frontend mock as the catalog seed source so the wired
+// storefront renders identically on day one (06-database-design.md §5).
+import {
+  categories as mockCategories,
+  brands as mockBrands,
+  products as mockProducts,
+  authors as mockAuthors,
+  buyingGuides as mockGuides,
+  comparisons as mockComparisons,
+} from '../../lib/data';
 
 const prisma = new PrismaClient();
 
@@ -83,7 +94,389 @@ async function main(): Promise<void> {
   });
   console.log('   ✓ default 2FA enforcement policy');
 
+  // 5. Catalog (categories → brands → products), ported from the frontend mock.
+  await seedCatalog();
+
+  // 6. Content (authors → guides → comparisons), ported from the frontend mock.
+  await seedContent();
+
+  // 7. Affiliate settings + campaigns + sample clicks + revenue (so the dashboard shows real data).
+  await seedAffiliate();
+
   console.log('✅ Seed complete.');
+}
+
+/** Deterministic 0..1 pseudo-random (no Math.random → reproducible seed). */
+function pseudo(n: number): number {
+  return ((n * 9301 + 49297) % 233280) / 233280;
+}
+
+/** SHA-256 hex (sample privacy-safe hash for seeded clicks). */
+function createHashHex(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+const DAY_MS = 86_400_000;
+
+/** Seeds the affiliate system with realistic sample data (idempotent). */
+async function seedAffiliate(): Promise<void> {
+  console.log('🌱 Seeding affiliate + revenue…');
+
+  // Settings (singleton). Disclosure text set so the compliance checklist passes.
+  await prisma.affiliateSettings.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: {
+      id: 'default',
+      amazonAssociateTag: 'cslifestyle-21',
+      amazonDomain: 'amazon.in',
+      linkCode: 'ogi',
+      disclosureText:
+        'CSLifestyle is a participant in the Amazon Associates Program. We may earn a commission on qualifying purchases made through our links.',
+      trackingEnabled: true,
+    },
+  });
+
+  // Campaigns.
+  for (const c of [
+    { name: 'Summer Sale 2026', slug: 'summer-sale', affiliateTag: 'cslifestyle-summer-21' },
+    { name: 'Festive Deals', slug: 'festive-deals', affiliateTag: null },
+  ]) {
+    await prisma.affiliateCampaign.upsert({
+      where: { slug: c.slug },
+      update: {},
+      create: { name: c.name, slug: c.slug, affiliateTag: c.affiliateTag, isActive: true },
+    });
+  }
+  console.log('   ✓ settings + 2 campaigns');
+
+  const products = await prisma.product.findMany({
+    select: { id: true, asin: true, currentPrice: true, category: { select: { name: true } } },
+  });
+
+  const DEVICES = ['mobile', 'desktop', 'tablet'] as const;
+  const SOURCES = ['product', 'search', 'guide', 'comparison', 'deals'] as const;
+
+  // Sample clicks across products over the last 30 days (privacy-safe hashes).
+  if ((await prisma.affiliateClick.count()) === 0) {
+    const clickData: {
+      asin: string;
+      productId: string;
+      sourceType: (typeof SOURCES)[number];
+      deviceType: (typeof DEVICES)[number];
+      ipHash: string;
+      userAgentHash: string;
+      country: string;
+      clickedAt: Date;
+    }[] = [];
+    for (let pi = 0; pi < products.length; pi++) {
+      const p = products[pi];
+      for (let day = 0; day < 30; day++) {
+        const count = Math.floor(pseudo(pi * 31 + day) * 4); // 0..3
+        for (let k = 0; k < count; k++) {
+          const r = pseudo(pi * 131 + day * 7 + k);
+          clickData.push({
+            asin: p.asin,
+            productId: p.id,
+            sourceType: SOURCES[Math.floor(r * SOURCES.length)],
+            deviceType: DEVICES[Math.floor(pseudo(pi + day + k) * DEVICES.length)],
+            ipHash: createHashHex(`ip-${pi}-${day}-${k}`),
+            userAgentHash: createHashHex(`ua-${pi}-${day}-${k}`),
+            country: 'IN',
+            clickedAt: new Date(Date.now() - day * DAY_MS - Math.floor(r * DAY_MS)),
+          });
+        }
+      }
+    }
+    if (clickData.length > 0) await prisma.affiliateClick.createMany({ data: clickData });
+    console.log(`   ✓ ${clickData.length} sample clicks`);
+  }
+
+  // Estimated revenue per product per day (idempotent).
+  if ((await prisma.revenueReport.count()) === 0) {
+    const reports: {
+      date: Date;
+      asin: string;
+      productId: string;
+      category: string | null;
+      actualRevenue: number;
+      orders: number;
+      clicks: number;
+      source: 'estimated';
+    }[] = [];
+    for (let pi = 0; pi < products.length; pi++) {
+      const p = products[pi];
+      const price = Number(p.currentPrice ?? 0);
+      for (let day = 0; day < 30; day++) {
+        const clicks = Math.floor(pseudo(pi * 31 + day) * 4);
+        if (clicks === 0) continue;
+        const orders = Math.max(0, Math.round(clicks * 0.04));
+        const revenue = Number((orders * price * 0.04).toFixed(2)); // ~4% commission
+        reports.push({
+          date: new Date(new Date(Date.now() - day * DAY_MS).toISOString().slice(0, 10)),
+          asin: p.asin,
+          productId: p.id,
+          category: p.category?.name ?? null,
+          actualRevenue: revenue,
+          orders,
+          clicks,
+          source: 'estimated',
+        });
+      }
+    }
+    if (reports.length > 0) await prisma.revenueReport.createMany({ data: reports });
+    console.log(`   ✓ ${reports.length} estimated revenue rows`);
+  }
+
+  // A sample Amazon CSV import record (so the imports list is populated).
+  if ((await prisma.revenueImport.count()) === 0) {
+    const total = await prisma.revenueReport.aggregate({ _sum: { actualRevenue: true } });
+    await prisma.revenueImport.create({
+      data: {
+        fileName: 'amazon-associates-sample.csv',
+        source: 'amazon_csv',
+        status: 'completed',
+        rowCount: 0,
+        totalRevenue: Number(total._sum.actualRevenue ?? 0),
+        periodStart: new Date(Date.now() - 30 * DAY_MS),
+        periodEnd: new Date(),
+      },
+    });
+    console.log('   ✓ sample revenue import record');
+  }
+}
+
+/** Seeds the catalog from the existing frontend mock (idempotent upserts). */
+async function seedCatalog(): Promise<void> {
+  console.log('🌱 Seeding catalog…');
+
+  // Categories.
+  for (const [i, c] of mockCategories.entries()) {
+    const data = {
+      name: c.name,
+      description: c.description,
+      image: c.image,
+      icon: c.icon,
+      subcategories: c.subcategories,
+      sortOrder: i,
+      isActive: true,
+    };
+    await prisma.category.upsert({
+      where: { slug: c.slug },
+      update: data,
+      create: { slug: c.slug, ...data },
+    });
+  }
+  console.log(`   ✓ ${mockCategories.length} categories`);
+
+  // Brands.
+  for (const b of mockBrands) {
+    const data = {
+      name: b.name,
+      logo: b.logo,
+      description: b.description,
+      rating: b.rating,
+      isActive: true,
+    };
+    await prisma.brand.upsert({
+      where: { slug: b.slug },
+      update: data,
+      create: { slug: b.slug, ...data },
+    });
+  }
+  console.log(`   ✓ ${mockBrands.length} brands`);
+
+  // Resolve slug → id maps.
+  const catBySlug = new Map(
+    (await prisma.category.findMany({ select: { id: true, slug: true } })).map((c) => [c.slug, c.id]),
+  );
+  const brandBySlug = new Map(
+    (await prisma.brand.findMany({ select: { id: true, slug: true } })).map((b) => [b.slug, b.id]),
+  );
+
+  // Products.
+  for (const p of mockProducts) {
+    const categoryId = catBySlug.get(p.categorySlug);
+    if (!categoryId) {
+      console.warn(`   ! skipping ${p.slug} — unknown category ${p.categorySlug}`);
+      continue;
+    }
+    const brandId = brandBySlug.get(p.brandSlug) ?? null;
+    const asin = `B0SEED${p.id.padStart(4, '0')}`;
+
+    const data = {
+      asin,
+      categoryId,
+      brandId,
+      title: p.name,
+      shortDescription: p.description.slice(0, 280),
+      description: p.description,
+      image: p.image,
+      gallery: p.images,
+      specifications: p.specifications,
+      highlights: p.highlights,
+      features: p.features,
+      pros: p.pros,
+      cons: p.cons,
+      faqs: p.faqs,
+      rating: p.rating,
+      reviewCount: p.reviewCount,
+      currentPrice: p.currentPrice,
+      originalPrice: p.originalPrice ?? null,
+      discountPercent: p.discount ?? null,
+      currency: 'INR',
+      availability: p.availability,
+      affiliateUrl: p.affiliateUrl,
+      isPublished: true,
+      isTrending: p.trending ?? false,
+      isEditorsPick: p.editorsPick ?? false,
+      dealExpiresIn: p.deal?.expiresIn ?? null,
+      dealSavings: p.deal?.savings ?? null,
+    };
+
+    const product = await prisma.product.upsert({
+      where: { slug: p.slug },
+      update: data,
+      create: { slug: p.slug, ...data },
+    });
+
+    // Resync gallery images (ProductImage normalised table).
+    await prisma.productImage.deleteMany({ where: { productId: product.id } });
+    if (p.images.length > 0) {
+      await prisma.productImage.createMany({
+        data: p.images.map((imageUrl, idx) => ({ productId: product.id, imageUrl, sortOrder: idx })),
+      });
+    }
+
+    // Seed one price-history point (only if none yet — keeps the seed idempotent).
+    const hasHistory = await prisma.productPriceHistory.count({ where: { productId: product.id } });
+    if (hasHistory === 0) {
+      await prisma.productPriceHistory.create({
+        data: {
+          productId: product.id,
+          price: p.currentPrice,
+          originalPrice: p.originalPrice ?? null,
+        },
+      });
+    }
+  }
+  console.log(`   ✓ ${mockProducts.length} products (+ images + price history)`);
+}
+
+/** Seeds authors, guides and comparisons from the existing frontend mock. */
+async function seedContent(): Promise<void> {
+  console.log('🌱 Seeding content…');
+
+  // Authors.
+  for (const a of mockAuthors) {
+    const data = {
+      name: a.name,
+      avatarUrl: a.avatar,
+      bio: a.bio,
+      expertise: a.expertise,
+      socialLinks: a.social,
+      isActive: true,
+    };
+    await prisma.author.upsert({ where: { slug: a.slug }, update: data, create: { slug: a.slug, ...data } });
+  }
+  console.log(`   ✓ ${mockAuthors.length} authors`);
+
+  // Resolve slug → id maps.
+  const catBySlug = new Map(
+    (await prisma.category.findMany({ select: { id: true, slug: true } })).map((c) => [c.slug, c.id]),
+  );
+  const authorBySlug = new Map(
+    (await prisma.author.findMany({ select: { id: true, slug: true } })).map((a) => [a.slug, a.id]),
+  );
+  const prodBySlug = new Map(
+    (await prisma.product.findMany({ select: { id: true, slug: true } })).map((p) => [p.slug, p.id]),
+  );
+
+  // Guides.
+  for (const g of mockGuides) {
+    const data = {
+      title: g.title,
+      excerpt: g.excerpt,
+      content: g.content,
+      coverImage: g.coverImage,
+      categoryId: catBySlug.get(g.categorySlug) ?? null,
+      authorId: authorBySlug.get(g.author.slug) ?? null,
+      readingTime: g.readingTime,
+      tableOfContents: g.tableOfContents,
+      tags: g.tags,
+      status: 'published' as const,
+      publishedAt: new Date(g.lastUpdated),
+    };
+    const guide = await prisma.guide.upsert({ where: { slug: g.slug }, update: data, create: { slug: g.slug, ...data } });
+
+    await prisma.guideProduct.deleteMany({ where: { guideId: guide.id } });
+    const recs = g.productRecommendations
+      .map((rec, i) => {
+        const productId = prodBySlug.get(rec.product.slug);
+        return productId
+          ? { guideId: guide.id, productId, position: i, reason: rec.reason, isTopPick: rec.isTopPick }
+          : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+    if (recs.length > 0) await prisma.guideProduct.createMany({ data: recs, skipDuplicates: true });
+  }
+  console.log(`   ✓ ${mockGuides.length} guides (+ product picks)`);
+
+  // Comparisons.
+  for (const c of mockComparisons) {
+    const productAId = prodBySlug.get(c.productA.slug);
+    const productBId = prodBySlug.get(c.productB.slug);
+    if (!productAId || !productBId) {
+      console.warn(`   ! skipping comparison ${c.slug} — missing product`);
+      continue;
+    }
+    const data = {
+      title: c.title,
+      excerpt: c.excerpt,
+      summary: c.summary,
+      productAId,
+      productBId,
+      verdict: c.verdict,
+      winner: c.winner,
+      prosCons: c.prosCons,
+      status: 'published' as const,
+      publishedAt: new Date('2024-01-15'),
+    };
+    const comparison = await prisma.comparison.upsert({
+      where: { slug: c.slug },
+      update: data,
+      create: { slug: c.slug, ...data },
+    });
+
+    await prisma.comparisonSpec.deleteMany({ where: { comparisonId: comparison.id } });
+    if (c.categories.length > 0) {
+      await prisma.comparisonSpec.createMany({
+        data: c.categories.map((s, i) => ({
+          comparisonId: comparison.id,
+          specName: s.name,
+          productAValue: s.productA,
+          productBValue: s.productB,
+          winner: s.winner,
+          details: s.details,
+          position: i,
+        })),
+      });
+    }
+    await prisma.comparisonProduct.deleteMany({ where: { comparisonId: comparison.id } });
+    await prisma.comparisonProduct.createMany({
+      data: [
+        { comparisonId: comparison.id, productId: productAId, position: 0 },
+        { comparisonId: comparison.id, productId: productBId, position: 1 },
+      ],
+      skipDuplicates: true,
+    });
+  }
+  console.log(`   ✓ ${mockComparisons.length} comparisons (+ specs)`);
+
+  // Build the unified search index so advanced search works on a fresh DB (Phase 11).
+  const { rebuildIndex } = await import('../src/services/discovery/index.service');
+  const { indexed } = await rebuildIndex();
+  console.log(`   ✓ search index built (${indexed} entries)`);
 }
 
 main()
