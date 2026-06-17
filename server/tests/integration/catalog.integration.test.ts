@@ -13,6 +13,8 @@ const app = createApp();
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@cslifestyle.in';
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe!2026';
 const USER_PASSWORD = 'Str0ngPass';
+/** A non-placeholder product image (create now requires a real image — Phase 13). */
+const REAL_IMG = 'https://m.media-amazon.com/images/I/81test.jpg';
 
 function cookieValue(res: request.Response, name: string): string | undefined {
   const arr = res.headers['set-cookie'] as unknown as string[] | undefined;
@@ -139,7 +141,7 @@ describe.skipIf(!RUN)('catalog integration (DB)', () => {
     const created = await agent
       .post('/api/products')
       .set('x-csrf-token', csrf)
-      .send({ asin, title: 'Test Widget', categoryId, currentPrice: 999, isPublished: false });
+      .send({ asin, title: 'Test Widget', categoryId, image: REAL_IMG, currentPrice: 999, isPublished: false });
     expect(created.status).toBe(201);
     const id = created.body.data.id as string;
     const slug = created.body.data.slug as string;
@@ -169,9 +171,9 @@ describe.skipIf(!RUN)('catalog integration (DB)', () => {
   it('rejects duplicate ASIN (409)', async () => {
     const { agent, csrf } = await adminSession();
     const asin = `B0DUP${randomUUID().slice(0, 6).toUpperCase()}`;
-    const first = await agent.post('/api/products').set('x-csrf-token', csrf).send({ asin, title: 'Dup A', categoryId });
+    const first = await agent.post('/api/products').set('x-csrf-token', csrf).send({ asin, title: 'Dup A', categoryId, image: REAL_IMG });
     expect(first.status).toBe(201);
-    const second = await agent.post('/api/products').set('x-csrf-token', csrf).send({ asin, title: 'Dup B', categoryId });
+    const second = await agent.post('/api/products').set('x-csrf-token', csrf).send({ asin, title: 'Dup B', categoryId, image: REAL_IMG });
     expect(second.status).toBe(409);
     await agent.delete(`/api/products/${first.body.data.id}`).set('x-csrf-token', csrf);
   });
@@ -182,7 +184,7 @@ describe.skipIf(!RUN)('catalog integration (DB)', () => {
     const created = await agent
       .post('/api/products')
       .set('x-csrf-token', csrf)
-      .send({ asin, title: 'Price Tracked', categoryId, currentPrice: 500 });
+      .send({ asin, title: 'Price Tracked', categoryId, image: REAL_IMG, currentPrice: 500 });
     const id = created.body.data.id as string;
     await agent.put(`/api/products/${id}`).set('x-csrf-token', csrf).send({ currentPrice: 450 });
     // Two points: initial 500 + updated 450 (asserted indirectly via no error + cleanup).
@@ -195,7 +197,7 @@ describe.skipIf(!RUN)('catalog integration (DB)', () => {
     const created = await agent
       .post('/api/products')
       .set('x-csrf-token', csrf)
-      .send({ asin, title: 'Bulk Item', categoryId, isPublished: false });
+      .send({ asin, title: 'Bulk Item', categoryId, image: REAL_IMG, isPublished: false });
     const id = created.body.data.id as string;
     const slug = created.body.data.slug as string;
 
@@ -220,7 +222,7 @@ describe.skipIf(!RUN)('catalog integration (DB)', () => {
     const prod = await agent
       .post('/api/products')
       .set('x-csrf-token', csrf)
-      .send({ asin: `B0CAT${randomUUID().slice(0, 6).toUpperCase()}`, title: 'In Cat', categoryId: catId });
+      .send({ asin: `B0CAT${randomUUID().slice(0, 6).toUpperCase()}`, title: 'In Cat', categoryId: catId, image: REAL_IMG });
     const prodId = prod.body.data.id as string;
 
     // Delete blocked (409).

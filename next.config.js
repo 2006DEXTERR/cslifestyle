@@ -47,6 +47,14 @@ const nextConfig = {
       // Media Library (Phase 10) — API + static uploaded files.
       { source: '/api/media/:path*', destination: `${backendOrigin}/api/media/:path*` },
       { source: '/uploads/:path*', destination: `${backendOrigin}/uploads/:path*` },
+      // Admin management (Phase 13: users, roles, settings, SEO sitemap status).
+      { source: '/api/users/:path*', destination: `${backendOrigin}/api/users/:path*` },
+      { source: '/api/users', destination: `${backendOrigin}/api/users` },
+      { source: '/api/roles/:path*', destination: `${backendOrigin}/api/roles/:path*` },
+      { source: '/api/roles', destination: `${backendOrigin}/api/roles` },
+      { source: '/api/settings/:path*', destination: `${backendOrigin}/api/settings/:path*` },
+      { source: '/api/settings', destination: `${backendOrigin}/api/settings` },
+      { source: '/api/seo/:path*', destination: `${backendOrigin}/api/seo/:path*` },
     ];
   },
 };

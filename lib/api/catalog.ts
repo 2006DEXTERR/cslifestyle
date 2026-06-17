@@ -43,6 +43,8 @@ export interface CatalogProduct extends Product {
   metaDescription: string | null;
   isPublished: boolean;
   gallery: string[];
+  /** Admin-only data-quality warnings (fake ASIN / stock image / placeholder link). Empty when clean. */
+  dataWarnings?: { field: 'asin' | 'image' | 'affiliateUrl'; message: string }[];
   createdAt: string;
   updatedAt: string;
 }

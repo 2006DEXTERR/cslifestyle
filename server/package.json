@@ -22,6 +22,10 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "products:list": "tsx scripts/list-products.ts",
+    "products:template": "tsx scripts/generate-template.ts",
+    "products:validate": "tsx scripts/bulk-update-products.ts --validate",
+    "products:bulk": "tsx scripts/bulk-update-products.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

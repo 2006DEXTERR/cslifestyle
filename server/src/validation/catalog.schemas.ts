@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isPlaceholderAsin, isPlaceholderAffiliateUrl, isPlaceholderImage } from '../lib/affiliate';
 
 /** Catalog validation (Phase 2). Bodies are validated by `validateBody`; list
  *  query strings are parsed in-controller via the `*ListQuerySchema` parsers. */
@@ -54,10 +55,56 @@ const productBase = {
   dealSavings: z.coerce.number().int().min(0).nullable().optional(),
 };
 
-export const createProductSchema = z.object(productBase);
-export const updateProductSchema = createProductSchema
+/**
+ * Reject saving fake/placeholder product data (Phase 13 data-integrity fix):
+ * fake ASINs (e.g. `B0SEED0001`), the placeholder `amazon.in/dp/example` URL, and
+ * stock/empty images. Applied only to fields that are present, so partial updates
+ * that don't touch a field stay valid.
+ */
+function refineProductData(b: { asin?: string; affiliateUrl?: string; image?: string }, ctx: z.RefinementCtx): void {
+  if (b.asin !== undefined && isPlaceholderAsin(b.asin)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['asin'],
+      message: 'Placeholder ASIN — provide a real Amazon ASIN (not a B0SEED-style stub).',
+    });
+  }
+  if (b.affiliateUrl !== undefined && b.affiliateUrl !== '' && isPlaceholderAffiliateUrl(b.affiliateUrl)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['affiliateUrl'],
+      message: 'Placeholder affiliate URL — leave blank to auto-generate from the ASIN, or provide a real product link.',
+    });
+  }
+  if (b.image !== undefined && isPlaceholderImage(b.image)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['image'],
+      message: 'Placeholder/stock or empty image — provide a real product image URL.',
+    });
+  }
+}
+
+export const createProductSchema = z.object(productBase).superRefine((b, ctx) => {
+  // On create, a real product image is required (cannot save empty images).
+  if (!b.image || isPlaceholderImage(b.image)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['image'],
+      message: 'A real product image is required.',
+    });
+  }
+  refineProductData(b, ctx);
+});
+export const updateProductSchema = z
+  .object(productBase)
   .partial()
-  .refine((b) => Object.keys(b).length > 0, { message: 'No fields to update' });
+  .superRefine((b, ctx) => {
+    if (Object.keys(b).length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [], message: 'No fields to update' });
+    }
+    refineProductData(b, ctx);
+  });
 
 export const bulkProductSchema = z.object({
   action: z.enum(['publish', 'unpublish', 'delete']),

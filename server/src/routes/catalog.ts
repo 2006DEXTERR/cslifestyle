@@ -7,6 +7,7 @@ import { requireCsrf } from '../middleware/csrf';
 import { validateBody } from '../middleware/validate';
 import { auditLogger } from '../middleware/audit';
 import { publicCatalogLimiter, searchLimiter } from '../middleware/rateLimit';
+import { publicCache } from '../middleware/cache';
 import {
   createProductSchema,
   updateProductSchema,
@@ -66,7 +67,7 @@ export const catalogRouter = Router();
  *       403: { description: Missing products.create }
  *       409: { description: Duplicate ASIN }
  */
-catalogRouter.get('/products', publicCatalogLimiter, optionalAuthenticate, asyncHandler(products.list));
+catalogRouter.get('/products', publicCatalogLimiter, optionalAuthenticate, publicCache(), asyncHandler(products.list));
 catalogRouter.post(
   '/products',
   authenticate,
@@ -120,7 +121,7 @@ catalogRouter.post(
  *       200: { description: Product }
  *       404: { description: Not found }
  */
-catalogRouter.get('/products/:slug', publicCatalogLimiter, optionalAuthenticate, asyncHandler(products.getBySlug));
+catalogRouter.get('/products/:slug', publicCatalogLimiter, optionalAuthenticate, publicCache(), asyncHandler(products.getBySlug));
 
 /**
  * @openapi
@@ -181,7 +182,7 @@ catalogRouter.delete(
  *       201: { description: Created }
  *       403: { description: Missing categories.create }
  */
-catalogRouter.get('/categories', publicCatalogLimiter, optionalAuthenticate, asyncHandler(categories.list));
+catalogRouter.get('/categories', publicCatalogLimiter, optionalAuthenticate, publicCache(), asyncHandler(categories.list));
 catalogRouter.post(
   '/categories',
   authenticate,
@@ -203,7 +204,7 @@ catalogRouter.post(
  *       200: { description: Category }
  *       404: { description: Not found }
  */
-catalogRouter.get('/categories/:slug', publicCatalogLimiter, optionalAuthenticate, asyncHandler(categories.getBySlug));
+catalogRouter.get('/categories/:slug', publicCatalogLimiter, optionalAuthenticate, publicCache(), asyncHandler(categories.getBySlug));
 
 /**
  * @openapi
@@ -261,7 +262,7 @@ catalogRouter.delete(
  *       201: { description: Created }
  *       403: { description: Missing brands.create }
  */
-catalogRouter.get('/brands', publicCatalogLimiter, optionalAuthenticate, asyncHandler(brands.list));
+catalogRouter.get('/brands', publicCatalogLimiter, optionalAuthenticate, publicCache(), asyncHandler(brands.list));
 catalogRouter.post(
   '/brands',
   authenticate,
@@ -283,7 +284,7 @@ catalogRouter.post(
  *       200: { description: Brand }
  *       404: { description: Not found }
  */
-catalogRouter.get('/brands/:slug', publicCatalogLimiter, optionalAuthenticate, asyncHandler(brands.getBySlug));
+catalogRouter.get('/brands/:slug', publicCatalogLimiter, optionalAuthenticate, publicCache(), asyncHandler(brands.getBySlug));
 
 /**
  * @openapi

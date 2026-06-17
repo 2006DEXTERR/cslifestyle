@@ -6,6 +6,8 @@
  * simply ignore but the admin panel uses for editing. See ADR-018.
  */
 import type { Prisma, Product, Category, Brand, ProductImage } from '@prisma/client';
+import { env } from '../../config/env';
+import { resolveAffiliateUrl, productDataWarnings, type ProductDataIssue } from '../../lib/affiliate';
 
 type Decimalish = Prisma.Decimal | number | null | undefined;
 
@@ -68,6 +70,8 @@ export interface PresentedProduct {
   metaDescription: string | null;
   isPublished: boolean;
   gallery: string[];
+  /** Admin-only data-quality warnings (fake ASIN / stock image / placeholder link). Empty when clean. */
+  dataWarnings: ProductDataIssue[];
   createdAt: string;
   updatedAt: string;
 }
@@ -86,6 +90,13 @@ export function presentProduct(p: ProductRow): PresentedProduct {
   const faqs = Array.isArray(p.faqs)
     ? (p.faqs as { question: string; answer: string }[])
     : [];
+
+  // Generate the public affiliate URL from the REAL ASIN (single source of truth);
+  // never surface a stored placeholder. Falls back to '' when the ASIN isn't real.
+  const affiliateUrl = resolveAffiliateUrl(p.asin, p.affiliateUrl, {
+    tag: env.AMAZON_ASSOCIATE_TAG,
+    domain: env.AMAZON_DOMAIN,
+  });
 
   return {
     id: p.id,
@@ -110,7 +121,7 @@ export function presentProduct(p: ProductRow): PresentedProduct {
     description: p.description ?? '',
     specifications: asRecord(p.specifications),
     faqs,
-    affiliateUrl: p.affiliateUrl ?? '',
+    affiliateUrl,
     trending: p.isTrending,
     editorsPick: p.isEditorsPick,
     deal: p.dealExpiresIn
@@ -128,6 +139,7 @@ export function presentProduct(p: ProductRow): PresentedProduct {
     metaDescription: p.metaDescription,
     isPublished: p.isPublished,
     gallery,
+    dataWarnings: productDataWarnings({ asin: p.asin, image: p.image, affiliateUrl: p.affiliateUrl }),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   };

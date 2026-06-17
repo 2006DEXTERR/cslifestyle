@@ -24,6 +24,7 @@ import {
   X,
   Upload,
   Star,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,7 @@ interface ProductRow {
   status: 'Published' | 'Draft';
   updatedAt: string;
   image: string;
+  warnings: string[];
   raw: CatalogProduct;
 }
 
@@ -61,6 +63,7 @@ function toRow(p: CatalogProduct): ProductRow {
     status: p.isPublished ? 'Published' : 'Draft',
     updatedAt: p.updatedAt,
     image: p.image,
+    warnings: (p.dataWarnings ?? []).map((w) => w.message),
     raw: p,
   };
 }
@@ -151,7 +154,18 @@ export default function ProductsAdminPage() {
         header: 'Product Name',
         cell: ({ row }) => (
           <div>
-            <p className="font-medium">{row.original.name}</p>
+            <p className="font-medium flex items-center gap-1.5">
+              {row.original.name}
+              {row.original.warnings.length > 0 && (
+                <span
+                  className="inline-flex shrink-0"
+                  aria-label="Data needs attention"
+                  title={`Needs real data:\n• ${row.original.warnings.join('\n• ')}`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                </span>
+              )}
+            </p>
             <p className="text-xs text-muted-foreground">{row.original.slug}</p>
           </div>
         ),

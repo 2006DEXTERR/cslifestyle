@@ -9,6 +9,7 @@ import {
   type RoleName,
 } from '../src/config/permissions';
 import { ENFORCE_2FA_ROLES_KEY } from '../src/services/settings.service';
+import { resolveAffiliateUrl } from '../src/lib/affiliate';
 // Reuse the existing frontend mock as the catalog seed source so the wired
 // storefront renders identically on day one (06-database-design.md §5).
 import {
@@ -302,7 +303,15 @@ async function seedCatalog(): Promise<void> {
       continue;
     }
     const brandId = brandBySlug.get(p.brandSlug) ?? null;
+    // NOTE: the mock has no real ASINs, so we mint a clearly-marked PLACEHOLDER
+    // (`B0SEED####`). It is flagged by `productDataWarnings`, rejected by the /go
+    // redirect engine, and produces NO affiliate URL — import real ASINs/images via
+    // `npm run products:bulk` (see server/README.md). Do not treat these as real.
     const asin = `B0SEED${p.id.padStart(4, '0')}`;
+    // Generate the affiliate URL from the ASIN ONLY when it's real; placeholder
+    // ASINs → null (never the old `amazon.in/dp/example` stub).
+    const affiliateUrl =
+      resolveAffiliateUrl(asin, p.affiliateUrl, { tag: 'cslifestyle-21', domain: 'amazon.in' }) || null;
 
     const data = {
       asin,
@@ -326,7 +335,7 @@ async function seedCatalog(): Promise<void> {
       discountPercent: p.discount ?? null,
       currency: 'INR',
       availability: p.availability,
-      affiliateUrl: p.affiliateUrl,
+      affiliateUrl,
       isPublished: true,
       isTrending: p.trending ?? false,
       isEditorsPick: p.editorsPick ?? false,

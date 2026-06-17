@@ -111,6 +111,13 @@ const EnvSchema = z
     MEDIA_BASE_URL: z.string().default(''), // '' → same-origin /uploads
     MEDIA_MAX_FILE_MB: z.coerce.number().int().min(1).max(50).default(10),
 
+    // Affiliate — canonical Amazon associate tag + domain used to GENERATE public
+    // product affiliate URLs (https://www.amazon.in/dp/{ASIN}?tag=...). The /go
+    // redirect engine still reads the DB AffiliateSettings; these defaults keep the
+    // presenter (sync, per-row) consistent with the seed without a DB hit.
+    AMAZON_ASSOCIATE_TAG: z.string().default('cslifestyle-21'),
+    AMAZON_DOMAIN: z.string().default('amazon.in'),
+
     // Cookies
     COOKIE_SECURE: z
       .enum(['true', 'false'])
