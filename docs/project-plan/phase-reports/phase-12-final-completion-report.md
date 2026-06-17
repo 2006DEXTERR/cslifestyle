@@ -44,7 +44,7 @@ output.
 
 ## 4. Tests executed (all green)
 
-12 migrations from an empty DB → seed (87 perms, 5 roles, 42 search-index entries) → **220/220 tests across
+11 migrations from an empty DB → seed (87 perms, 5 roles, 42 search-index entries) → **220/220 tests across
 33 files**; backend `tsc`/`eslint`/`build` ✅; frontend `tsc`/`build` ✅ (42 routes, standalone output);
 health endpoints test-covered. CI runs the same backend gates + a frontend job.
 

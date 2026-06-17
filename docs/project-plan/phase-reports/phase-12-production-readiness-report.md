@@ -54,7 +54,7 @@
 
 ## 5. Verification (this phase)
 
-12 migrations from empty → seed (87 perms, 5 roles, search index) → **220/220 tests**; backend + frontend
+11 migrations from empty → seed (87 perms, 5 roles, search index) → **220/220 tests**; backend + frontend
 `tsc`/`lint`/`build` ✅; standalone output produced; health endpoints test-covered.
 
 ## 6. Production go-live checklist (operator)

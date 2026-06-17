@@ -57,7 +57,7 @@ BACKEND_ORIGIN=http://api-host:4000 node .next/standalone/server.js
 - **Apply migrations:** `npm run prisma:deploy` (= `prisma migrate deploy`) — idempotent, forward-only.
 - **Seed:** `npm run db:seed` — idempotent upserts (permissions/roles/catalog/content + builds the search
   index). Safe to re-run.
-- **Fresh DB:** all 12 migrations apply cleanly from empty (verified each phase).
+- **Fresh DB:** all 11 migrations apply cleanly from empty (verified each phase).
 
 ## 6. Health & rollout
 

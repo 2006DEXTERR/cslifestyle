@@ -4,6 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Check, X, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { adminApi, type AdminRole } from '@/lib/api/admin';
 
 const modules = [
   'Products',
@@ -18,66 +19,44 @@ const modules = [
 
 const actions = ['View', 'Create', 'Edit', 'Delete', 'Publish'];
 
-const rolesData = [
-  {
-    name: 'Super Admin',
-    description: 'Full access to all features and settings',
-    color: '#E91E8F',
-    permissions: modules.reduce((acc, m) => {
-      acc[m] = { View: true, Create: true, Edit: true, Delete: true, Publish: true };
-      return acc;
-    }, {} as Record<string, Record<string, boolean>>),
-  },
-  {
-    name: 'Editor',
-    description: 'Can create, edit and publish content',
-    color: '#FF7A00',
-    permissions: {
-      Products: { View: true, Create: true, Edit: true, Delete: false, Publish: true },
-      Categories: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Brands: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Guides: { View: true, Create: true, Edit: true, Delete: false, Publish: true },
-      Comparisons: { View: true, Create: true, Edit: true, Delete: false, Publish: true },
-      Authors: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Users: { View: false, Create: false, Edit: false, Delete: false, Publish: false },
-      Settings: { View: false, Create: false, Edit: false, Delete: false, Publish: false },
-    },
-  },
-  {
-    name: 'SEO Manager',
-    description: 'Can manage SEO settings for content',
-    color: '#FFC107',
-    permissions: {
-      Products: { View: true, Create: false, Edit: true, Delete: false, Publish: false },
-      Categories: { View: true, Create: false, Edit: true, Delete: false, Publish: false },
-      Brands: { View: true, Create: false, Edit: true, Delete: false, Publish: false },
-      Guides: { View: true, Create: false, Edit: true, Delete: false, Publish: false },
-      Comparisons: { View: true, Create: false, Edit: true, Delete: false, Publish: false },
-      Authors: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Users: { View: false, Create: false, Edit: false, Delete: false, Publish: false },
-      Settings: { View: true, Create: false, Edit: true, Delete: false, Publish: false },
-    },
-  },
-  {
-    name: 'Analyst',
-    description: 'Can view analytics and reports',
-    color: '#4CAF50',
-    permissions: {
-      Products: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Categories: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Brands: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Guides: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Comparisons: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Authors: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-      Users: { View: false, Create: false, Edit: false, Delete: false, Publish: false },
-      Settings: { View: true, Create: false, Edit: false, Delete: false, Publish: false },
-    },
-  },
-];
+/** Colours preserved from the original design; cycled across live roles. */
+const roleColors = ['#E91E8F', '#FF7A00', '#FFC107', '#4CAF50', '#9C27B0'];
+
+interface PresentedRole {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  permissionSet: Set<string>;
+}
+
+function titleCase(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function presentRoles(roles: AdminRole[]): PresentedRole[] {
+  return roles.map((r, index) => ({
+    id: r.id,
+    name: titleCase(r.name),
+    description: r.description ?? '',
+    color: roleColors[index % roleColors.length],
+    permissionSet: new Set(r.permissions),
+  }));
+}
+
+function hasPermission(role: PresentedRole, moduleLabel: string, actionLabel: string): boolean {
+  return role.permissionSet.has(`${moduleLabel.toLowerCase()}.${actionLabel.toLowerCase()}`);
+}
 
 export default function RolesAdminPage() {
-  const [editingRole, setEditingRole] = React.useState<string | null>(null);
-  const [permissions, setPermissions] = React.useState(rolesData);
+  const [rolesData, setRolesData] = React.useState<PresentedRole[]>([]);
+
+  React.useEffect(() => {
+    adminApi
+      .listRoles()
+      .then((roles) => setRolesData(presentRoles(roles)))
+      .catch(() => undefined);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -151,13 +130,13 @@ export default function RolesAdminPage() {
                               <div
                                 key={action}
                                 className={`w-6 h-6 rounded flex items-center justify-center text-xs ${
-                                  role.permissions[module]?.[action]
+                                  hasPermission(role, module, action)
                                     ? 'bg-green-500/10 text-green-600'
                                     : 'bg-muted text-muted-foreground'
                                 }`}
                                 title={`${role.name} - ${module} - ${action}`}
                               >
-                                {role.permissions[module]?.[action] ? (
+                                {hasPermission(role, module, action) ? (
                                   <Check className="w-3.5 h-3.5" />
                                 ) : (
                                   <X className="w-3.5 h-3.5" />

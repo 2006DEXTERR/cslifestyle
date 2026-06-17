@@ -16,62 +16,48 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { adminApi, type AdminUser, type AdminRole } from '@/lib/api/admin';
 
-const mockUsers = [
-  {
-    id: '1',
-    name: 'Admin User',
-    email: 'admin@cslifestyle.in',
-    avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?w=100',
-    role: 'Super Admin',
-    status: 'active',
-    lastLogin: '2024-01-22 10:30',
-  },
-  {
-    id: '2',
-    name: 'Priya Sharma',
-    email: 'priya@cslifestyle.in',
-    avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?w=100',
-    role: 'Editor',
-    status: 'active',
-    lastLogin: '2024-01-21 14:20',
-  },
-  {
-    id: '3',
-    name: 'Rahul Verma',
-    email: 'rahul@cslifestyle.in',
-    avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100',
-    role: 'Editor',
-    status: 'active',
-    lastLogin: '2024-01-20 09:15',
-  },
-  {
-    id: '4',
-    name: 'Amit Kumar',
-    email: 'amit@cslifestyle.in',
-    avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?w=100',
-    role: 'SEO Manager',
-    status: 'active',
-    lastLogin: '2024-01-19 16:45',
-  },
-  {
-    id: '5',
-    name: 'Sneha Patel',
-    email: 'sneha@cslifestyle.in',
-    avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?w=100',
-    role: 'Analyst',
-    status: 'inactive',
-    lastLogin: '2023-12-15 11:00',
-  },
-];
+function formatLastLogin(value: string | null): string {
+  if (!value) return 'Never';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? 'Never' : d.toLocaleString();
+}
 
 export default function UsersAdminPage() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [rolFilter, setRoleFilter] = React.useState('');
   const [isEditorOpen, setIsEditorOpen] = React.useState(false);
-  const [editingUser, setEditingUser] = React.useState<typeof mockUsers[0] | null>(null);
+  const [editingUser, setEditingUser] = React.useState<AdminUser | null>(null);
 
-  const filteredUsers = mockUsers.filter((user) => {
+  const [users, setUsers] = React.useState<AdminUser[]>([]);
+  const [roleList, setRoleList] = React.useState<AdminRole[]>([]);
+  const [form, setForm] = React.useState({ name: '', email: '', roleId: '', status: 'active' });
+  const [saving, setSaving] = React.useState(false);
+
+  const loadUsers = React.useCallback(() => {
+    adminApi
+      .listUsers({ perPage: 100 })
+      .then((r) => setUsers(r.items))
+      .catch(() => undefined);
+  }, []);
+
+  React.useEffect(() => {
+    loadUsers();
+    adminApi.listRoles().then(setRoleList).catch(() => undefined);
+  }, [loadUsers]);
+
+  React.useEffect(() => {
+    if (!isEditorOpen) return;
+    setForm({
+      name: editingUser?.name ?? '',
+      email: editingUser?.email ?? '',
+      roleId: editingUser?.roleId ?? roleList[0]?.id ?? '',
+      status: editingUser?.status ?? 'active',
+    });
+  }, [isEditorOpen, editingUser, roleList]);
+
+  const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -79,7 +65,41 @@ export default function UsersAdminPage() {
     return matchesSearch && matchesRole;
   });
 
-  const roles = ['Super Admin', 'Editor', 'SEO Manager', 'Analyst'];
+  const roles = roleList.map((r) => r.name);
+
+  async function handleSave() {
+    if (!editingUser) {
+      setIsEditorOpen(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await adminApi.updateUser(editingUser.id, {
+        name: form.name,
+        email: form.email,
+        roleId: form.roleId,
+      });
+      const nextActive = form.status === 'active';
+      if (nextActive !== (editingUser.status === 'active')) {
+        await adminApi.setUserStatus(editingUser.id, nextActive);
+      }
+      loadUsers();
+      setIsEditorOpen(false);
+    } catch {
+      // keep the drawer open on failure
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleStatus(user: AdminUser) {
+    try {
+      await adminApi.setUserStatus(user.id, user.status !== 'active');
+      loadUsers();
+    } catch {
+      // ignore
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -141,7 +161,13 @@ export default function UsersAdminPage() {
               <tr key={user.id} className="hover:bg-muted/50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">
+                        {user.name[0]}
+                      </div>
+                    )}
                     <div>
                       <p className="font-medium text-sm">{user.name}</p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -158,7 +184,8 @@ export default function UsersAdminPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span
+                  <button
+                    onClick={() => toggleStatus(user)}
                     className={`px-2 py-1 rounded-full text-xs font-medium ${
                       user.status === 'active'
                         ? 'bg-green-500/10 text-green-600'
@@ -166,12 +193,12 @@ export default function UsersAdminPage() {
                     }`}
                   >
                     {user.status}
-                  </span>
+                  </button>
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    {user.lastLogin}
+                    {formatLastLogin(user.lastLogin)}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -227,28 +254,38 @@ export default function UsersAdminPage() {
               <div className="p-6 space-y-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Full Name</label>
-                  <Input defaultValue={editingUser?.name} />
+                  <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Email</label>
-                  <Input type="email" defaultValue={editingUser?.email} />
+                  <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Role</label>
-                  <select className="w-full h-10 rounded-lg border bg-background px-3" defaultValue={editingUser?.role}>
-                    {roles.map((role) => (
-                      <option key={role}>{role}</option>
+                  <select
+                    className="w-full h-10 rounded-lg border bg-background px-3"
+                    value={form.roleId}
+                    onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value }))}
+                  >
+                    {roleList.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Status</label>
-                  <select className="w-full h-10 rounded-lg border bg-background px-3" defaultValue={editingUser?.status}>
-                    <option>active</option>
-                    <option>inactive</option>
+                  <select
+                    className="w-full h-10 rounded-lg border bg-background px-3"
+                    value={form.status}
+                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                  >
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
                   </select>
                 </div>
 
@@ -263,7 +300,9 @@ export default function UsersAdminPage() {
                 <Button variant="outline" onClick={() => setIsEditorOpen(false)}>
                   Cancel
                 </Button>
-                <Button className="bg-brand-gradient">Save User</Button>
+                <Button className="bg-brand-gradient" onClick={handleSave} disabled={saving}>
+                  Save User
+                </Button>
               </div>
             </motion.div>
           </>

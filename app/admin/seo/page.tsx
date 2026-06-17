@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, AlertCircle, CheckCircle2, AlertTriangle, XCircle, Globe, FileText, Link, TrendingUp, Activity, RefreshCw, Download, Filter, Eye, ExternalLink, ChevronDown, ChevronRight, MoreHorizontal, Plus, Settings, Zap, Calendar, Clock, BarChart3, Layers } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
+import { adminApi, type SitemapStatus } from '@/lib/api/admin';
 
 const indexedPagesData = [
   { date: 'Jun 1', indexed: 2450, submitted: 2500 }, { date: 'Jun 2', indexed: 2475, submitted: 2510 },
@@ -41,6 +42,11 @@ const severityIcons = { critical: XCircle, high: AlertCircle, medium: AlertTrian
 export default function SEOCenterPage() {
   const [activeTab, setActiveTab] = useState<'health' | 'sitemap' | 'audit' | 'keywords'>('health');
   const [expandedFinding, setExpandedFinding] = useState<number | null>(null);
+  // Real sitemap status (Phase 13) — DB-backed count of indexable URLs.
+  const [sitemap, setSitemap] = useState<SitemapStatus | null>(null);
+  useEffect(() => {
+    adminApi.sitemapStatus().then(setSitemap).catch(() => undefined);
+  }, []);
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-600';
@@ -82,7 +88,7 @@ export default function SEOCenterPage() {
             <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-950/30"><Globe className="h-6 w-6 text-blue-600" /></div>
             <div className="flex items-center gap-1 text-xs text-green-600"><TrendingUp className="h-3 w-3" />+2.4%</div>
           </div>
-          <div className="mt-4"><p className="text-2xl font-bold text-foreground">2,560 / 2,580</p><p className="text-sm text-muted-foreground">Pages Indexed</p></div>
+          <div className="mt-4"><p className="text-2xl font-bold text-foreground">{sitemap ? `${formatNumber(sitemap.totalUrls)} / ${formatNumber(sitemap.totalUrls)}` : '— / —'}</p><p className="text-sm text-muted-foreground">Pages Indexed</p></div>
         </div>
         <div className="rounded-xl border border-border bg-card p-6">
           <div className="flex items-center justify-between">

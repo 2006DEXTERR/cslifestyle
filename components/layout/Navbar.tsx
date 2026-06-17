@@ -22,8 +22,10 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { categories } from '@/lib/data';
-import { Category } from '@/lib/types';
+import { catalogApi } from '@/lib/api/catalog';
+
+/** Minimal shape the mega-menu needs for a category link. */
+type MenuCategory = { name: string; slug: string; image?: string | null };
 
 interface NavbarProps {
   onSearchOpen?: () => void;
@@ -33,7 +35,7 @@ const megaMenuData = {
   categories: {
     title: 'All Categories',
     icon: LayoutGrid,
-    items: categories.slice(0, 8),
+    items: [] as MenuCategory[],
   },
   guides: {
     title: 'Buying Guides',
@@ -83,6 +85,21 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
   const [activeMenu, setActiveMenu] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+  // Live mega-menu categories (Phase 13) — replaces the former mock list.
+  const [categoryItems, setCategoryItems] = React.useState<MenuCategory[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    catalogApi
+      .listCategories()
+      .then((cats) => {
+        if (active) setCategoryItems(cats.slice(0, 8).map((c) => ({ name: c.name, slug: c.slug, image: c.image })));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -152,7 +169,7 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
                       className="absolute top-full left-0 pt-2"
                     >
                       <div className="w-64 rounded-xl border bg-popover p-2 shadow-lg">
-                        {megaMenuData[item.key as keyof typeof megaMenuData].items.map((subItem: any, index: number) => (
+                        {(item.key === 'categories' ? categoryItems : megaMenuData[item.key as keyof typeof megaMenuData].items).map((subItem: any, index: number) => (
                           <Link
                             key={subItem.slug || index}
                             href={`/${item.key === 'categories' ? 'categories' : item.key}/${subItem.slug}`}

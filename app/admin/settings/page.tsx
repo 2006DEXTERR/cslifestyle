@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { adminApi } from '@/lib/api/admin';
 
 const tabs = [
   { id: 'general', label: 'General', icon: SettingsIcon },
@@ -24,8 +25,73 @@ const tabs = [
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
+/** Default values preserve the original on-screen copy until a setting is saved. */
+const DEFAULTS: Record<string, string> = {
+  'site.name': 'CSLifestyle',
+  'site.url': 'https://cslifestyle.in',
+  'site.description':
+    "India's most trusted product discovery platform. Expert reviews, buying guides, and comparisons.",
+  'site.contact_email': 'contact@cslifestyle.in',
+  'brand.primary_color': '#E91E8F',
+  'affiliate.amazon_id': '',
+  'affiliate.flipkart_id': '',
+  'affiliate.disclosure':
+    'We may earn a commission when you click links on our site and make a purchase. This helps us maintain our site and continue providing valuable content.',
+  'affiliate.auto_append': 'true',
+  'seo.meta_title': 'CSLifestyle - Find The Best Products Before You Buy',
+  'seo.meta_description':
+    "India's most trusted product discovery platform. Expert buying guides, detailed comparisons, and honest reviews for smartphones, laptops, and more.",
+  'seo.gsc_verification': '',
+  'seo.robots_txt': 'User-agent: *\nAllow: /\n\nSitemap: https://cslifestyle.in/sitemap.xml',
+  'email.smtp_host': '',
+  'email.smtp_port': '587',
+  'email.encryption': 'TLS',
+  'email.smtp_username': '',
+  'email.smtp_password': '',
+  'email.from_address': 'noreply@cslifestyle.in',
+  'analytics.ga_id': '',
+  'analytics.gtm_id': '',
+  'analytics.custom_js': '',
+  'analytics.enabled': 'true',
+};
+
 export default function SettingsAdminPage() {
   const [activeTab, setActiveTab] = React.useState('general');
+  const [values, setValues] = React.useState<Record<string, string>>(DEFAULTS);
+  const [saving, setSaving] = React.useState(false);
+  const [savedAt, setSavedAt] = React.useState(false);
+
+  const load = React.useCallback(() => {
+    adminApi
+      .getSettings()
+      .then(({ values: v }) => setValues((prev) => ({ ...prev, ...v })))
+      .catch(() => undefined);
+  }, []);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  const get = (key: string) => values[key] ?? '';
+  const set = (key: string, value: string) => {
+    setSavedAt(false);
+    setValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const payload: Record<string, string> = { ...values };
+      // Don't overwrite the stored SMTP password with a blank field.
+      if (!payload['email.smtp_password']) delete payload['email.smtp_password'];
+      await adminApi.saveSettings(payload);
+      setSavedAt(true);
+    } catch {
+      // ignore — leave the form as-is
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -68,25 +134,26 @@ export default function SettingsAdminPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Site Name</label>
-                    <Input defaultValue="CSLifestyle" />
+                    <Input value={get('site.name')} onChange={(e) => set('site.name', e.target.value)} />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Site URL</label>
-                    <Input defaultValue="https://cslifestyle.in" />
+                    <Input value={get('site.url')} onChange={(e) => set('site.url', e.target.value)} />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Site Description</label>
                     <textarea
                       className="w-full min-h-[100px] rounded-lg border bg-background p-3 text-sm"
-                      defaultValue="India's most trusted product discovery platform. Expert reviews, buying guides, and comparisons."
+                      value={get('site.description')}
+                      onChange={(e) => set('site.description', e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Contact Email</label>
-                    <Input defaultValue="contact@cslifestyle.in" />
+                    <Input value={get('site.contact_email')} onChange={(e) => set('site.contact_email', e.target.value)} />
                   </div>
                 </div>
               </motion.div>
@@ -124,10 +191,15 @@ export default function SettingsAdminPage() {
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        defaultValue="#E91E8F"
+                        value={get('brand.primary_color')}
+                        onChange={(e) => set('brand.primary_color', e.target.value)}
                         className="w-10 h-10 rounded-lg cursor-pointer"
                       />
-                      <Input defaultValue="#E91E8F" className="max-w-[200px]" />
+                      <Input
+                        value={get('brand.primary_color')}
+                        onChange={(e) => set('brand.primary_color', e.target.value)}
+                        className="max-w-[200px]"
+                      />
                     </div>
                   </div>
 
@@ -157,19 +229,28 @@ export default function SettingsAdminPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Amazon Affiliate ID</label>
-                    <Input placeholder="cslife-21" />
+                    <Input
+                      placeholder="cslife-21"
+                      value={get('affiliate.amazon_id')}
+                      onChange={(e) => set('affiliate.amazon_id', e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Flipkart Affiliate ID</label>
-                    <Input placeholder="aff_id=XXXXXXX" />
+                    <Input
+                      placeholder="aff_id=XXXXXXX"
+                      value={get('affiliate.flipkart_id')}
+                      onChange={(e) => set('affiliate.flipkart_id', e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Default Affiliate Disclosure</label>
                     <textarea
                       className="w-full min-h-[100px] rounded-lg border bg-background p-3 text-sm"
-                      defaultValue="We may earn a commission when you click links on our site and make a purchase. This helps us maintain our site and continue providing valuable content."
+                      value={get('affiliate.disclosure')}
+                      onChange={(e) => set('affiliate.disclosure', e.target.value)}
                     />
                   </div>
 
@@ -178,7 +259,12 @@ export default function SettingsAdminPage() {
                       <p className="font-medium">Auto-append affiliate parameters</p>
                       <p className="text-sm text-muted-foreground">Automatically add affiliate IDs to product URLs</p>
                     </div>
-                    <input type="checkbox" defaultChecked className="w-5 h-5" />
+                    <input
+                      type="checkbox"
+                      checked={get('affiliate.auto_append') === 'true'}
+                      onChange={(e) => set('affiliate.auto_append', e.target.checked ? 'true' : 'false')}
+                      className="w-5 h-5"
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -195,30 +281,33 @@ export default function SettingsAdminPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Default Meta Title</label>
-                    <Input defaultValue="CSLifestyle - Find The Best Products Before You Buy" />
+                    <Input value={get('seo.meta_title')} onChange={(e) => set('seo.meta_title', e.target.value)} />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Default Meta Description</label>
                     <textarea
                       className="w-full min-h-[100px] rounded-lg border bg-background p-3 text-sm"
-                      defaultValue="India's most trusted product discovery platform. Expert buying guides, detailed comparisons, and honest reviews for smartphones, laptops, and more."
+                      value={get('seo.meta_description')}
+                      onChange={(e) => set('seo.meta_description', e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Google Search Console Verification</label>
-                    <Input placeholder="Enter verification code" />
+                    <Input
+                      placeholder="Enter verification code"
+                      value={get('seo.gsc_verification')}
+                      onChange={(e) => set('seo.gsc_verification', e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Robots.txt</label>
                     <textarea
                       className="w-full min-h-[150px] rounded-lg border bg-background p-3 text-sm font-mono"
-                      defaultValue={`User-agent: *
-Allow: /
-
-Sitemap: https://cslifestyle.in/sitemap.xml`}
+                      value={get('seo.robots_txt')}
+                      onChange={(e) => set('seo.robots_txt', e.target.value)}
                     />
                   </div>
                 </div>
@@ -236,17 +325,25 @@ Sitemap: https://cslifestyle.in/sitemap.xml`}
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">SMTP Host</label>
-                    <Input placeholder="smtp.example.com" />
+                    <Input
+                      placeholder="smtp.example.com"
+                      value={get('email.smtp_host')}
+                      onChange={(e) => set('email.smtp_host', e.target.value)}
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">SMTP Port</label>
-                      <Input defaultValue="587" />
+                      <Input value={get('email.smtp_port')} onChange={(e) => set('email.smtp_port', e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Encryption</label>
-                      <select className="w-full h-10 rounded-lg border bg-background px-3">
+                      <select
+                        className="w-full h-10 rounded-lg border bg-background px-3"
+                        value={get('email.encryption')}
+                        onChange={(e) => set('email.encryption', e.target.value)}
+                      >
                         <option>TLS</option>
                         <option>SSL</option>
                         <option>None</option>
@@ -257,17 +354,26 @@ Sitemap: https://cslifestyle.in/sitemap.xml`}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">SMTP Username</label>
-                      <Input placeholder="username" />
+                      <Input
+                        placeholder="username"
+                        value={get('email.smtp_username')}
+                        onChange={(e) => set('email.smtp_username', e.target.value)}
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">SMTP Password</label>
-                      <Input type="password" placeholder="••••••••" />
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        value={get('email.smtp_password')}
+                        onChange={(e) => set('email.smtp_password', e.target.value)}
+                      />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">From Email Address</label>
-                    <Input defaultValue="noreply@cslifestyle.in" />
+                    <Input value={get('email.from_address')} onChange={(e) => set('email.from_address', e.target.value)} />
                   </div>
                 </div>
               </motion.div>
@@ -284,12 +390,20 @@ Sitemap: https://cslifestyle.in/sitemap.xml`}
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Google Analytics Tracking ID</label>
-                    <Input placeholder="G-XXXXXXXXXX" />
+                    <Input
+                      placeholder="G-XXXXXXXXXX"
+                      value={get('analytics.ga_id')}
+                      onChange={(e) => set('analytics.ga_id', e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Google Tag Manager ID</label>
-                    <Input placeholder="GTM-XXXXXX" />
+                    <Input
+                      placeholder="GTM-XXXXXX"
+                      value={get('analytics.gtm_id')}
+                      onChange={(e) => set('analytics.gtm_id', e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -297,6 +411,8 @@ Sitemap: https://cslifestyle.in/sitemap.xml`}
                     <textarea
                       className="w-full min-h-[150px] rounded-lg border bg-background p-3 text-sm font-mono"
                       placeholder="// Add custom analytics scripts here"
+                      value={get('analytics.custom_js')}
+                      onChange={(e) => set('analytics.custom_js', e.target.value)}
                     />
                   </div>
 
@@ -305,7 +421,12 @@ Sitemap: https://cslifestyle.in/sitemap.xml`}
                       <p className="font-medium">Enable Analytics Tracking</p>
                       <p className="text-sm text-muted-foreground">Track page views and user interactions</p>
                     </div>
-                    <input type="checkbox" defaultChecked className="w-5 h-5" />
+                    <input
+                      type="checkbox"
+                      checked={get('analytics.enabled') === 'true'}
+                      onChange={(e) => set('analytics.enabled', e.target.checked ? 'true' : 'false')}
+                      className="w-5 h-5"
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -314,8 +435,9 @@ Sitemap: https://cslifestyle.in/sitemap.xml`}
 
           {/* Save Button */}
           <div className="flex items-center justify-end gap-3 p-4 border-t">
-            <Button variant="outline">Cancel</Button>
-            <Button className="bg-brand-gradient">
+            {savedAt && <span className="text-sm text-green-600 mr-auto">Settings saved</span>}
+            <Button variant="outline" onClick={load}>Cancel</Button>
+            <Button className="bg-brand-gradient" onClick={handleSave} disabled={saving}>
               <Save className="w-4 h-4 mr-2" />
               Save Settings
             </Button>

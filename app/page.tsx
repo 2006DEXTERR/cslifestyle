@@ -30,16 +30,8 @@ import { ProductCard } from '@/components/products/ProductCard';
 import { CategoryCard } from '@/components/categories/CategoryCard';
 import { GuideCard } from '@/components/guides/GuideCard';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
-import {
-  categories,
-  products,
-  buyingGuides,
-  comparisons,
-  brands,
-  getTrendingProducts,
-  getEditorsPicks,
-  getDeals,
-} from '@/lib/data';
+import { catalogApi, type CatalogProduct, type CatalogCategory, type CatalogBrand } from '@/lib/api/catalog';
+import { contentApi, type ContentGuide, type ContentComparison } from '@/lib/api/content';
 import { formatNumber } from '@/lib/format';
 
 const fadeInUp = {
@@ -57,9 +49,43 @@ const staggerContainer = {
 };
 
 export default function Home() {
-  const trendingProducts = getTrendingProducts();
-  const editorsPicks = getEditorsPicks();
-  const deals = getDeals();
+  // Live data (Phase 13) — same shapes/sections as before, sourced from the API.
+  const [categories, setCategories] = React.useState<CatalogCategory[]>([]);
+  const [products, setProducts] = React.useState<CatalogProduct[]>([]);
+  const [trendingProducts, setTrendingProducts] = React.useState<CatalogProduct[]>([]);
+  const [editorsPicks, setEditorsPicks] = React.useState<CatalogProduct[]>([]);
+  const [deals, setDeals] = React.useState<CatalogProduct[]>([]);
+  const [buyingGuides, setBuyingGuides] = React.useState<ContentGuide[]>([]);
+  const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
+  const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      const [cats, prods, trending, picks, dealList, guides, comps, brandList] = await Promise.all([
+        catalogApi.listCategories().catch(() => [] as CatalogCategory[]),
+        catalogApi.listProducts({ perPage: 8, sort: 'newest' }).then((r) => r.items).catch(() => [] as CatalogProduct[]),
+        catalogApi.listProducts({ trending: true, perPage: 4 }).then((r) => r.items).catch(() => [] as CatalogProduct[]),
+        catalogApi.listProducts({ editorsPick: true, perPage: 3 }).then((r) => r.items).catch(() => [] as CatalogProduct[]),
+        catalogApi.listProducts({ deals: true, perPage: 4 }).then((r) => r.items).catch(() => [] as CatalogProduct[]),
+        contentApi.listGuides({ perPage: 3 }).then((r) => r.items).catch(() => [] as ContentGuide[]),
+        contentApi.listComparisons({ perPage: 3 }).then((r) => r.items).catch(() => [] as ContentComparison[]),
+        catalogApi.listBrands().catch(() => [] as CatalogBrand[]),
+      ]);
+      if (!active) return;
+      setCategories(cats);
+      setProducts(prods);
+      setTrendingProducts(trending.length ? trending : prods);
+      setEditorsPicks(picks.length ? picks : prods);
+      setDeals(dealList.length ? dealList : prods);
+      setBuyingGuides(guides);
+      setComparisons(comps);
+      setBrands(brandList);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col">
@@ -155,7 +181,7 @@ export default function Home() {
           </motion.div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-            {products.slice(0, 4).map((product) => (
+            {trendingProducts.slice(0, 4).map((product) => (
               <motion.div
                 key={product.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -319,7 +345,7 @@ export default function Home() {
           </motion.div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-            {products.slice(0, 4).map((product) => (
+            {deals.slice(0, 4).map((product) => (
               <motion.div
                 key={product.id}
                 initial={{ opacity: 0, y: 20 }}

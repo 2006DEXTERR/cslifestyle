@@ -1,8 +1,8 @@
 # Phase 12 — Database Coverage Report
 
-**Date:** 2026-06-15 · **Phase:** 12 (final) · **Schema:** `server/prisma/schema.prisma` · **47 models · 12 migrations**
+**Date:** 2026-06-15 · **Phase:** 12 (final) · **Schema:** `server/prisma/schema.prisma` · **47 models · 11 migrations**
 
-All 12 migrations apply cleanly from an empty database (verified every phase + this one), then the
+All 11 migrations apply cleanly from an empty database (verified every phase + this one), then the
 idempotent seed runs (87 permissions, 5 roles, catalog/content/affiliate demo data, 42 search-index
 entries).
 
@@ -51,5 +51,5 @@ All forward-only + reversible-by-design; `prisma migrate deploy` is idempotent.
 
 ## 5. Verification
 
-`prisma migrate deploy` from empty → 12 migrations applied → seed → 220/220 tests green against embedded
+`prisma migrate deploy` from empty → 11 migrations applied → seed → 220/220 tests green against embedded
 PostgreSQL. No drift (`prisma validate` clean; `prisma format` applied).

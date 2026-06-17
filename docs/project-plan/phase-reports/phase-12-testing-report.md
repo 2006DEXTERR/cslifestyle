@@ -11,7 +11,7 @@
 | Backend build | `npm run build` (tsc) | ✅ |
 | Frontend typecheck | `tsc --noEmit` | ✅ |
 | Frontend build | `next build` | ✅ (42 routes, **standalone** output) |
-| Migrations from empty | `prisma migrate deploy` | ✅ (12 migrations) |
+| Migrations from empty | `prisma migrate deploy` | ✅ (11 migrations) |
 | Seed | `tsx prisma/seed.ts` | ✅ (87 perms, 5 roles, 42 index entries) |
 | **Tests** | `vitest run` (RUN_DB_TESTS=true) | ✅ **220 / 220 across 33 files** |
 | Smoke (health) | `tests/health.test.ts` | ✅ (`/healthz` + `/readyz`) |

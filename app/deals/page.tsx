@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Percent, Clock, TrendingUp, ChevronRight, Filter, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/products/ProductCard';
-import { products, categories } from '@/lib/data';
+import { catalogApi, type CatalogProduct } from '@/lib/api/catalog';
 
 const dealCategories = [
   { id: 'all', name: 'All Deals', count: 24 },
@@ -28,8 +28,20 @@ export default function DealsPage() {
   const [sortBy, setSortBy] = React.useState('discount');
   const [showExpired, setShowExpired] = React.useState(false);
 
-  // Filter products with deals/discounts
-  const dealProducts = products.filter((p) => p.discount || p.deal);
+  // Live discounted products (Phase 13) — the catalog deals feed.
+  const [dealProducts, setDealProducts] = React.useState<CatalogProduct[]>([]);
+  React.useEffect(() => {
+    let active = true;
+    catalogApi
+      .listProducts({ deals: true, perPage: 100 })
+      .then((r) => {
+        if (active) setDealProducts(r.items);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredProducts = activeCategory === 'all'
     ? dealProducts
@@ -217,7 +229,7 @@ export default function DealsPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {products.slice(0, 4).map((product) => (
+                  {dealProducts.slice(0, 4).map((product) => (
                     <ProductCard key={product.id} product={product} showDeal />
                   ))}
                 </div>

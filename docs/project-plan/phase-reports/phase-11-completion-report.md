@@ -46,7 +46,7 @@ Companion reports: [Search Coverage](phase-11-search-coverage-report.md) ·
 ## 2. Migrations
 
 - `20260615212232_discovery_search_recommendations` — `SearchSynonym`, `SearchIndexEntry`,
-  `RecommendationRule`, `InternalLink`. **All 12 migrations apply cleanly from an empty DB**, then seed
+  `RecommendationRule`, `InternalLink`. **All 11 migrations apply cleanly from an empty DB**, then seed
   runs + builds the index (42 entries).
 
 ## 3. APIs added (18)

@@ -23,6 +23,7 @@ import { marketingRouter } from './routes/marketing';
 import { mediaRouter } from './routes/media';
 import { uploadRoot } from './services/media/storage';
 import { discoveryRouter } from './routes/discovery';
+import { adminRouter } from './routes/admin';
 import { swaggerSpec } from './docs/swagger';
 
 /**
@@ -81,6 +82,9 @@ export function createApp(): Express {
 
   // Discovery — advanced search, recommendations, internal linking (Phase 11).
   app.use('/api', discoveryRouter);
+
+  // Admin management — users, roles, settings, SEO sitemap status (Phase 13).
+  app.use('/api', adminRouter);
 
   // Versioned API surface.
   app.use(env.API_PREFIX, apiRouter);

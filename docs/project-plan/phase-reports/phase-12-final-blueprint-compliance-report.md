@@ -79,7 +79,7 @@ partials)**. The partials are all **external-integration / admin-editor polish**
 | **UI routes** (public + admin) | ✅ preserved | `app/**` — 42 build routes; all original routes intact + additive admin screens |
 | **Admin screens wired** | ✅ 13 | products/categories/brands/guides/comparisons/authors/affiliate/import/ai/analytics/marketing/media/discovery |
 | **Backend APIs** | ✅ ~129 | 9 routers mounted at `/api` + `/go` + `/uploads` + `/healthz`/`/readyz` + Swagger `/docs` |
-| **Database models** | ✅ 47 | `server/prisma/schema.prisma`, 12 migrations apply from empty |
+| **Database models** | ✅ 47 | `server/prisma/schema.prisma`, 11 migrations apply from empty |
 | **Workflows** (import→AI, affiliate click, analytics, campaign delivery, discovery index) | ✅ | BullMQ inline/bullmq driver (ADR-023) + 6 workers |
 | **Security** | ✅ | see Security Audit Report — no critical/high |
 | **SEO** | ✅ (🟡 indexing-ping) | SSR + metadata + JSON-LD + sitemap + robots |

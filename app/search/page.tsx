@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/products/ProductCard';
 import { GuideCard } from '@/components/guides/GuideCard';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
-import { products, buyingGuides, comparisons, brands } from '@/lib/data';
+import { catalogApi, type CatalogProduct, type CatalogBrand } from '@/lib/api/catalog';
+import { contentApi, type ContentGuide, type ContentComparison } from '@/lib/api/content';
 import { discoveryApi } from '@/lib/api/discovery';
 
 const defaultTrendingSearches = [
@@ -37,10 +38,10 @@ export default function SearchPage() {
   const [activeTab, setActiveTab] = React.useState<'all' | 'products' | 'guides' | 'comparisons' | 'brands'>('all');
   const [isSearching, setIsSearching] = React.useState(false);
   const [results, setResults] = React.useState<{
-    products: typeof products;
-    guides: typeof buyingGuides;
-    comparisons: typeof comparisons;
-    brands: typeof brands;
+    products: CatalogProduct[];
+    guides: ContentGuide[];
+    comparisons: ContentComparison[];
+    brands: CatalogBrand[];
   }>({
     products: [],
     guides: [],
@@ -48,40 +49,28 @@ export default function SearchPage() {
     brands: [],
   });
 
-  const performSearch = (searchQuery: string) => {
-    if (!searchQuery.trim()) {
+  // Live, DB-driven search (Phase 13). Debounced; queries the live catalog +
+  // content search endpoints (full-text `q`) so the existing rich cards render
+  // real results. Stale responses are dropped via the request-id guard.
+  const searchSeq = React.useRef(0);
+  React.useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
       setResults({ products: [], guides: [], comparisons: [], brands: [] });
       return;
     }
-
-    const q = searchQuery.toLowerCase();
-    setResults({
-      products: products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q)
-      ),
-      guides: buyingGuides.filter(
-        (g) =>
-          g.title.toLowerCase().includes(q) ||
-          g.excerpt.toLowerCase().includes(q) ||
-          g.tags.some((t) => t.toLowerCase().includes(q))
-      ),
-      comparisons: comparisons.filter(
-        (c) =>
-          c.title.toLowerCase().includes(q) ||
-          c.excerpt.toLowerCase().includes(q)
-      ),
-      brands: brands.filter(
-        (b) =>
-          b.name.toLowerCase().includes(q)
-      ),
-    });
-  };
-
-  React.useEffect(() => {
-    performSearch(query);
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(async () => {
+      const [prods, guides, comps, brandList] = await Promise.all([
+        catalogApi.listProducts({ q: trimmed, perPage: 24 }).then((r) => r.items).catch(() => [] as CatalogProduct[]),
+        contentApi.listGuides({ q: trimmed, perPage: 12 }).then((r) => r.items).catch(() => [] as ContentGuide[]),
+        contentApi.listComparisons({ q: trimmed, perPage: 12 }).then((r) => r.items).catch(() => [] as ContentComparison[]),
+        catalogApi.listBrands({ q: trimmed }).catch(() => [] as CatalogBrand[]),
+      ]);
+      if (seq !== searchSeq.current) return; // a newer query superseded this one
+      setResults({ products: prods, guides, comparisons: comps, brands: brandList });
+    }, 250);
+    return () => clearTimeout(timer);
   }, [query]);
 
   const totalResults =

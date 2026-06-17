@@ -42,7 +42,7 @@
 - **Configs added:** `Dockerfile`, `docker-compose.prod.yml`, `.env.example`, `.env.production.example`,
   `public/.gitkeep`, `README.md`, `next.config.js` (`output: 'standalone'`), `.github/workflows/ci.yml`
   (+frontend job), `server/.env.example` (expanded). **No application code changed.**
-- **Verification (all green):** 12 migrations apply from an empty DB → seed (87 permissions, 5 roles,
+- **Verification (all green):** 11 migrations apply from an empty DB → seed (87 permissions, 5 roles,
   catalog/content/affiliate seeds, search index 42 entries) → **220/220 tests across 33 files**; backend
   `tsc`/`eslint`/`build` ✅; frontend `tsc`/`build` ✅ (42 pages, **standalone output produced**); health
   endpoints covered by tests.
