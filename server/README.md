@@ -59,6 +59,36 @@ is built so you can load real data later **without inventing anything**:
   table shows an amber ⚠ with the exact issues (hover for details). The API exposes the
   same as `product.dataWarnings`.
 
+### Quick UX testing (fastest — only fill `asin` + `image`)
+
+For testing the user experience you do **not** need full Amazon data. Generate a
+template that includes a ready-made Amazon.in **search URL** per product, then fill
+only the ASIN and image:
+
+```bash
+cd server
+
+# 1. Generate ./my-products.csv with an amazonSearchUrl per product
+npm run products:quick-template      # add -- --force to overwrite a file with real data
+
+# 2. For each row: open the amazonSearchUrl → click the first product →
+#    copy the ASIN from the URL (/dp/XXXXXXXXXX) → right-click the main image →
+#    "Copy image address" → paste both into the asin + image columns.
+#    For testing, only fill `asin` and `image`. Leave `affiliateUrl` blank.
+
+# 3. Check + apply (unfilled NEEDS_ rows are skipped safely — do as few as you like)
+npm run products:validate
+npm run products:bulk
+
+# 4. Restart the app to see the images + working Amazon buttons
+#    backend:  npm run dev          (in server/)
+#    frontend: npm run dev          (in the repo root)
+```
+
+`title`, `price`, `originalPrice`, `rating`, `reviewCount`, `specs` and `description`
+are **optional** — they keep their seeded values, so the storefront renders fully while
+you test. The Amazon "Buy" button works as soon as a real `asin` is imported.
+
 ### Load real product images + Amazon links (one CSV, 4 commands)
 
 You only paste real **ASINs** and **image URLs** into one CSV — affiliate links are

@@ -36,7 +36,9 @@ const prisma = new PrismaClient();
 
 const DEFAULT_CSV = 'my-products.csv';
 const REQUIRED_HEADERS = ['slug'] as const;
-const KNOWN_HEADERS = ['slug', 'name', 'asin', 'image', 'affiliateurl'] as const;
+// `amazonsearchurl` (from the quick template) is accepted and ignored — it's a
+// human helper column, not imported.
+const KNOWN_HEADERS = ['slug', 'name', 'amazonsearchurl', 'asin', 'image', 'affiliateurl'] as const;
 
 /** Unfilled template placeholders — treated as "not provided yet" (not an error). */
 const PENDING_RE = /^(needs_|paste_|todo|tbd|<.*>$|xxx+)/i;
