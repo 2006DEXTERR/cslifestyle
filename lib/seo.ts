@@ -4,14 +4,20 @@
 import type { Metadata } from 'next';
 import type { CatalogProduct } from '@/lib/api/catalog';
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://cslifestyle.in').replace(/\/$/, '');
+// Site-owned default OG/Twitter + Organization-logo image. Defaults to a SAME-ORIGIN
+// asset (place a 1200×630 image at public/og-default.png) — override with
+// NEXT_PUBLIC_OG_IMAGE. (Replaces a stale external scaffold URL; no external asset.)
+const OG_IMAGE = process.env.NEXT_PUBLIC_OG_IMAGE ?? `${SITE_URL}/og-default.png`;
+
 export const SITE = {
   name: 'CSLifestyle',
-  url: (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://cslifestyle.in').replace(/\/$/, ''),
+  url: SITE_URL,
   description:
     "India's most trusted product discovery platform. Expert buying guides, comparisons, and reviews for smartphones, laptops, earbuds, and more.",
   twitter: '@cslifestyle',
-  logo: 'https://bolt.new/static/og_default.png',
-  defaultImage: 'https://bolt.new/static/og_default.png',
+  logo: OG_IMAGE,
+  defaultImage: OG_IMAGE,
 };
 
 /** Absolute URL from a path (or pass-through if already absolute). */
