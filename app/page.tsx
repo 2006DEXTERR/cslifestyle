@@ -32,6 +32,7 @@ import { GuideCard } from '@/components/guides/GuideCard';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { catalogApi, type CatalogProduct, type CatalogCategory, type CatalogBrand } from '@/lib/api/catalog';
 import { contentApi, type ContentGuide, type ContentComparison } from '@/lib/api/content';
+import { subscribeNewsletter } from '@/lib/api/marketing';
 import { formatNumber } from '@/lib/format';
 
 const fadeInUp = {
@@ -86,6 +87,38 @@ export default function Home() {
       active = false;
     };
   }, []);
+
+  // Newsletter signup (client-side; posts to the live /api/newsletter/subscribe).
+  const [newsletterEmail, setNewsletterEmail] = React.useState('');
+  const [newsletterState, setNewsletterState] = React.useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [newsletterMessage, setNewsletterMessage] = React.useState('');
+
+  const handleNewsletterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // keep the SPA — no full page reload
+    const email = newsletterEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setNewsletterState('error');
+      setNewsletterMessage('Please enter a valid email address.');
+      return;
+    }
+    setNewsletterState('submitting');
+    setNewsletterMessage('');
+    try {
+      const status = await subscribeNewsletter(email, 'homepage');
+      setNewsletterState('success');
+      setNewsletterMessage(
+        status === 'already_subscribed'
+          ? "You're already subscribed — thanks!"
+          : status === 'active'
+            ? "You're subscribed! Check your inbox for the best deals."
+            : 'Almost there — check your inbox to confirm your subscription.',
+      );
+      setNewsletterEmail('');
+    } catch {
+      setNewsletterState('error');
+      setNewsletterMessage('Something went wrong. Please try again.');
+    }
+  };
 
   return (
     <div className="flex flex-col">
@@ -630,23 +663,31 @@ export default function Home() {
               <p className="text-white/80 text-lg mb-8">
                 Subscribe to our newsletter and never miss out on exclusive deals, new product launches, and expert buying guides.
               </p>
-              <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto" onSubmit={handleNewsletterSubmit}>
                 <div className="relative flex-1">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="email"
                     placeholder="Enter your email"
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
                     className="w-full h-12 pl-12 pr-4 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="h-12 px-8 rounded-xl bg-white text-brand-pink font-bold shadow-lg hover:bg-white/90 transition-colors"
+                  disabled={newsletterState === 'submitting'}
+                  className="h-12 px-8 rounded-xl bg-white text-brand-pink font-bold shadow-lg hover:bg-white/90 transition-colors disabled:opacity-70"
                   style={{ backgroundColor: 'white', color: '#E91E8F' }}
                 >
-                  Subscribe
+                  {newsletterState === 'submitting' ? 'Subscribing…' : 'Subscribe'}
                 </button>
               </form>
+              {newsletterMessage && (
+                <p className={`mt-4 text-sm ${newsletterState === 'error' ? 'text-white' : 'text-white/90'}`}>
+                  {newsletterMessage}
+                </p>
+              )}
               <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-white/80">
                 <span className="flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4" /> No spam, ever
