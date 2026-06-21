@@ -1,7 +1,7 @@
 // Server-side data fetchers for the SSR detail pages.
 //
 // Server Components cannot use the browser-only next.config.js rewrites, so these
-// call the backend at an ABSOLUTE origin (BACKEND_ORIGIN, default localhost:4000) —
+// call the backend at an ABSOLUTE origin (BACKEND_ORIGIN, default 127.0.0.1:4000) —
 // the same env var the rewrites use. Requests are anonymous, so the public API
 // returns published/active rows only (correct for public SSR). Every call is
 // resilient (try/catch → null/[]) so `next build` succeeds even if the backend is
@@ -10,7 +10,9 @@
 import type { CatalogProduct, CatalogCategory, CatalogBrand } from '@/lib/api/catalog';
 import type { ContentGuide, ContentComparison, ContentAuthor } from '@/lib/api/content';
 
-const BACKEND = process.env.BACKEND_ORIGIN || 'http://localhost:4000';
+// IPv4 127.0.0.1 (not "localhost") avoids an IPv6 ::1 resolution miss against the
+// IPv4-bound backend on Windows during local dev. Prod overrides via env.
+const BACKEND = process.env.BACKEND_ORIGIN || 'http://127.0.0.1:4000';
 
 /** Default ISR window (seconds) for catalog/content reads. */
 export const REVALIDATE = 3600;

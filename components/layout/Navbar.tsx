@@ -172,7 +172,7 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
                         {(item.key === 'categories' ? categoryItems : megaMenuData[item.key as keyof typeof megaMenuData].items).map((subItem: any, index: number) => (
                           <Link
                             key={subItem.slug || index}
-                            href={`/${item.key === 'categories' ? 'categories' : item.key}/${subItem.slug}`}
+                            href={item.key === 'deals' ? '/deals' : `/${item.key === 'categories' ? 'categories' : item.key}/${subItem.slug}`}
                             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-accent"
                           >
                             <div className="flex-shrink-0">

@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
-const backendOrigin = process.env.BACKEND_ORIGIN || 'http://localhost:4000';
+// Default to IPv4 127.0.0.1 (not "localhost") so the dev proxy doesn't resolve to
+// IPv6 ::1 and fail to reach the IPv4-bound backend on Windows. Prod overrides via env.
+const backendOrigin = process.env.BACKEND_ORIGIN || 'http://127.0.0.1:4000';
 
 const nextConfig = {
   // Slim, self-contained server bundle for the production Docker image (Phase 12).
