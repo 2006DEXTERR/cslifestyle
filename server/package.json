@@ -27,6 +27,7 @@
     "products:quick-template": "tsx scripts/quick-template.ts",
     "products:validate": "tsx scripts/bulk-update-products.ts --validate",
     "products:bulk": "tsx scripts/bulk-update-products.ts",
+    "guides:fix-images": "tsx scripts/fix-guide-images.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
