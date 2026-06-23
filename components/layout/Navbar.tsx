@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -81,6 +81,7 @@ const megaMenuData = {
 
 export function Navbar({ onSearchOpen }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [activeMenu, setActiveMenu] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -114,6 +115,14 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
+
+  // Navigate to the search results page on submit (Enter). The /search page reads ?q=.
+  const submitSearch = () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    router.push(`/search?q=${encodeURIComponent(q)}`);
+    setIsMenuOpen(false);
   };
 
   const navItems = [
@@ -204,6 +213,7 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
                 placeholder="Search products, guides, comparisons..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
                 className="pl-10 pr-4 h-10"
               />
             </div>
@@ -260,6 +270,9 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
                 <Input
                   type="search"
                   placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
                   className="pl-10"
                 />
               </div>

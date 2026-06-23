@@ -35,6 +35,11 @@ export default function SearchPage() {
   }, []);
 
   const [query, setQuery] = React.useState('');
+  // Seed the query from the URL (?q=) so navbar/homepage searches land with results.
+  React.useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) setQuery(q);
+  }, []);
   const [activeTab, setActiveTab] = React.useState<'all' | 'products' | 'guides' | 'comparisons' | 'brands'>('all');
   const [isSearching, setIsSearching] = React.useState(false);
   const [results, setResults] = React.useState<{

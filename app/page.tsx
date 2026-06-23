@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -59,6 +60,14 @@ export default function Home() {
   const [buyingGuides, setBuyingGuides] = React.useState<ContentGuide[]>([]);
   const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
   const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
+
+  // Hero search → navigate to the results page (which reads ?q=).
+  const router = useRouter();
+  const [heroSearch, setHeroSearch] = React.useState('');
+  const submitHeroSearch = () => {
+    const q = heroSearch.trim();
+    if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
+  };
 
   React.useEffect(() => {
     let active = true;
@@ -161,9 +170,15 @@ export default function Home() {
                 <Input
                   type="search"
                   placeholder="Search products, brands, guides..."
+                  value={heroSearch}
+                  onChange={(e) => setHeroSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitHeroSearch(); }}
                   className="pl-12 pr-4 h-14 text-lg rounded-xl"
                 />
-                <Button className="absolute right-2 top-1/2 -translate-y-1/2 bg-brand-gradient hover:opacity-90">
+                <Button
+                  onClick={submitHeroSearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-brand-gradient hover:opacity-90"
+                >
                   Search
                 </Button>
               </div>
