@@ -28,6 +28,7 @@
     "products:validate": "tsx scripts/bulk-update-products.ts --validate",
     "products:bulk": "tsx scripts/bulk-update-products.ts",
     "guides:fix-images": "tsx scripts/fix-guide-images.ts",
+    "categories:fix-images": "tsx scripts/fix-category-images.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
