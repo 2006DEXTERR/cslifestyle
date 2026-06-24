@@ -29,6 +29,8 @@
     "products:bulk": "tsx scripts/bulk-update-products.ts",
     "guides:fix-images": "tsx scripts/fix-guide-images.ts",
     "categories:fix-images": "tsx scripts/fix-category-images.ts",
+    "products:fetch-amazon": "tsx scripts/fetch-amazon-products.ts",
+    "products:apply-amazon-review": "tsx scripts/apply-amazon-review.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

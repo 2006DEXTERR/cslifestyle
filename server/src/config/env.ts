@@ -118,6 +118,16 @@ const EnvSchema = z
     AMAZON_ASSOCIATE_TAG: z.string().default('cslifestyle-21'),
     AMAZON_DOMAIN: z.string().default('amazon.in'),
 
+    // Amazon Product Advertising API (PA-API 5.0) — used ONLY by the offline
+    // `products:fetch-amazon` script to look up products by keyword (no scraping).
+    // Optional: unset unless you run that script. Credentials come from an approved
+    // Amazon Associates + PA-API account.
+    AMAZON_PAAPI_ACCESS_KEY: z.string().optional(),
+    AMAZON_PAAPI_SECRET_KEY: z.string().optional(),
+    AMAZON_PAAPI_PARTNER_TAG: z.string().optional(), // defaults to AMAZON_ASSOCIATE_TAG if unset
+    AMAZON_PAAPI_MARKETPLACE: z.string().default('www.amazon.in'),
+    AMAZON_PAAPI_REGION: z.string().default('eu-west-1'),
+
     // Cookies
     COOKIE_SECURE: z
       .enum(['true', 'false'])
