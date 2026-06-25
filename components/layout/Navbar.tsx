@@ -2,10 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search,
   Menu,
   X,
   Sun,
@@ -21,22 +20,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { catalogApi } from '@/lib/api/catalog';
-import { discoveryApi, type SearchSuggestion, type SuggestionType } from '@/lib/api/discovery';
+import { SearchAutocomplete } from '@/components/search/SearchAutocomplete';
 
 /** Minimal shape the mega-menu needs for a category link. */
 type MenuCategory = { name: string; slug: string; image?: string | null };
-
-/** Autocomplete group display order + headers (predictive search). */
-const SUGGESTION_GROUPS: { type: SuggestionType; label: string }[] = [
-  { type: 'product', label: 'Products' },
-  { type: 'category', label: 'Categories' },
-  { type: 'brand', label: 'Brands' },
-  { type: 'guide', label: 'Guides' },
-  { type: 'comparison', label: 'Comparisons' },
-  { type: 'popular', label: 'Popular searches' },
-];
 
 interface NavbarProps {
   onSearchOpen?: () => void;
@@ -92,16 +80,8 @@ const megaMenuData = {
 
 export function Navbar({ onSearchOpen }: NavbarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [activeMenu, setActiveMenu] = React.useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = React.useState('');
-  // Predictive autocomplete (Phase 13.x) — DB-backed, grouped, debounced, keyboard + mouse.
-  const [suggestions, setSuggestions] = React.useState<SearchSuggestion[]>([]);
-  const [showSuggest, setShowSuggest] = React.useState(false);
-  const [activeIdx, setActiveIdx] = React.useState(-1);
-  const suggestSeq = React.useRef(0);
-  const blurTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
   // Live mega-menu categories (Phase 13) — replaces the former mock list.
   const [categoryItems, setCategoryItems] = React.useState<MenuCategory[]>([]);
@@ -132,122 +112,6 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
-
-  // Debounced autocomplete: fetch DB-backed suggestions as the user types (≥2 chars).
-  React.useEffect(() => {
-    const q = searchQuery.trim();
-    if (q.length < 2) { setSuggestions([]); setActiveIdx(-1); return; }
-    const seq = ++suggestSeq.current;
-    const timer = setTimeout(() => {
-      discoveryApi
-        .suggestions(q)
-        .then((s) => {
-          if (seq !== suggestSeq.current) return; // a newer keystroke superseded this
-          setSuggestions(s.slice(0, 8));
-          setActiveIdx(-1);
-        })
-        .catch(() => undefined);
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Navigate to the search results page. Enter searches the current input; a chosen
-  // suggestion searches that suggestion. The /search page reads ?q=.
-  const runSearch = (term?: string) => {
-    const q = (term ?? searchQuery).trim();
-    if (!q) return;
-    if (term && term !== searchQuery) setSearchQuery(term);
-    setShowSuggest(false);
-    setActiveIdx(-1);
-    router.push(`/search?q=${encodeURIComponent(q)}`);
-    setIsMenuOpen(false);
-  };
-
-  // Group suggestions by source (display order) and flatten for keyboard navigation.
-  const orderedGroups = React.useMemo(
-    () => SUGGESTION_GROUPS.map((g) => ({ ...g, items: suggestions.filter((s) => s.type === g.type) })).filter((g) => g.items.length > 0),
-    [suggestions],
-  );
-  const ordered = React.useMemo(() => orderedGroups.flatMap((g) => g.items), [orderedGroups]);
-  // Navigable rows = each suggestion + the trailing "Search for …" row (index === ordered.length).
-
-  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (ordered.length) { setShowSuggest(true); setActiveIdx((i) => Math.min(i + 1, ordered.length)); }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveIdx((i) => Math.max(i - 1, -1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      // A highlighted suggestion searches its label; the "Search for …" row or no
-      // selection searches the raw input.
-      runSearch(activeIdx >= 0 && activeIdx < ordered.length ? ordered[activeIdx].label : undefined);
-    } else if (e.key === 'Escape') {
-      setShowSuggest(false);
-      setActiveIdx(-1);
-    }
-  };
-
-  const onSearchBlur = () => {
-    if (blurTimer.current) clearTimeout(blurTimer.current);
-    blurTimer.current = setTimeout(() => setShowSuggest(false), 120); // allow click to register
-  };
-
-  // Predictive autocomplete dropdown — grouped by type, with a trailing "Search for …"
-  // row. Reuses the existing popover styling (mega-menu look); no redesign.
-  const renderSuggestions = () => {
-    if (!showSuggest || ordered.length === 0) return null;
-    const offsets: number[] = [];
-    orderedGroups.reduce((acc, g, i) => { offsets[i] = acc; return acc + g.items.length; }, 0);
-    const rawQuery = searchQuery.trim();
-    return (
-      <div className="absolute top-full left-0 right-0 mt-2 z-50">
-        <ul className="rounded-xl border bg-popover p-2 shadow-lg max-h-96 overflow-auto" role="listbox">
-          {orderedGroups.map((g, gi) => (
-            <React.Fragment key={g.type}>
-              <li className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground" role="presentation">{g.label}</li>
-              {g.items.map((s, ii) => {
-                const idx = offsets[gi] + ii;
-                return (
-                  <li key={`${g.type}:${s.label}`} role="option" aria-selected={activeIdx === idx}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => { e.preventDefault(); runSearch(s.label); }}
-                      onMouseEnter={() => setActiveIdx(idx)}
-                      className={cn(
-                        'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-left transition-colors hover:bg-accent',
-                        activeIdx === idx && 'bg-accent',
-                      )}
-                    >
-                      <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                      <span className="truncate">{s.label}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </React.Fragment>
-          ))}
-          {rawQuery && (
-            <li role="option" aria-selected={activeIdx === ordered.length} className="mt-1 border-t pt-1">
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); runSearch(); }}
-                onMouseEnter={() => setActiveIdx(ordered.length)}
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-left transition-colors hover:bg-accent',
-                  activeIdx === ordered.length && 'bg-accent',
-                )}
-              >
-                <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                <span className="truncate">Search for &ldquo;{rawQuery}&rdquo;</span>
-              </button>
-            </li>
-          )}
-        </ul>
-      </div>
-    );
   };
 
   const navItems = [
@@ -331,23 +195,12 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
 
           {/* Search Bar */}
           <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search products, guides, comparisons..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setShowSuggest(true); }}
-                onFocus={() => { if (suggestions.length) setShowSuggest(true); }}
-                onBlur={onSearchBlur}
-                onKeyDown={onSearchKeyDown}
-                role="combobox"
-                aria-expanded={showSuggest && suggestions.length > 0}
-                aria-autocomplete="list"
-                className="pl-10 pr-4 h-10"
-              />
-              {renderSuggestions()}
-            </div>
+            <SearchAutocomplete
+              className="w-full"
+              placeholder="Search products, guides, comparisons..."
+              iconClassName="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+              inputClassName="pl-10 pr-4 h-10"
+            />
           </div>
 
           {/* Right Side */}
@@ -396,23 +249,12 @@ export function Navbar({ onSearchOpen }: NavbarProps) {
           >
             <div className="container mx-auto px-4 py-4 space-y-4">
               {/* Mobile Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setShowSuggest(true); }}
-                  onFocus={() => { if (suggestions.length) setShowSuggest(true); }}
-                  onBlur={onSearchBlur}
-                  onKeyDown={onSearchKeyDown}
-                  role="combobox"
-                  aria-expanded={showSuggest && suggestions.length > 0}
-                  aria-autocomplete="list"
-                  className="pl-10"
-                />
-                {renderSuggestions()}
-              </div>
+              <SearchAutocomplete
+                placeholder="Search..."
+                iconClassName="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                inputClassName="pl-10"
+                onSearch={() => setIsMenuOpen(false)}
+              />
 
               {/* Mobile Nav Items */}
               <nav className="space-y-1">

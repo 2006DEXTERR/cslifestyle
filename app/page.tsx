@@ -2,10 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-  Search,
   TrendingUp,
   Award,
   Clock,
@@ -26,7 +24,7 @@ import {
   Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchAutocomplete } from '@/components/search/SearchAutocomplete';
 import { ProductCard } from '@/components/products/ProductCard';
 import { CategoryCard } from '@/components/categories/CategoryCard';
 import { GuideCard } from '@/components/guides/GuideCard';
@@ -60,14 +58,6 @@ export default function Home() {
   const [buyingGuides, setBuyingGuides] = React.useState<ContentGuide[]>([]);
   const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
   const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
-
-  // Hero search → navigate to the results page (which reads ?q=).
-  const router = useRouter();
-  const [heroSearch, setHeroSearch] = React.useState('');
-  const submitHeroSearch = () => {
-    const q = heroSearch.trim();
-    if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
-  };
 
   React.useEffect(() => {
     let active = true;
@@ -165,23 +155,12 @@ export default function Home() {
 
             {/* Search Bar */}
             <div className="w-full max-w-2xl mb-8">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search products, brands, guides..."
-                  value={heroSearch}
-                  onChange={(e) => setHeroSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitHeroSearch(); }}
-                  className="pl-12 pr-4 h-14 text-lg rounded-xl"
-                />
-                <Button
-                  onClick={submitHeroSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-brand-gradient hover:opacity-90"
-                >
-                  Search
-                </Button>
-              </div>
+              <SearchAutocomplete
+                placeholder="Search products, brands, guides..."
+                iconClassName="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"
+                inputClassName="pl-12 pr-4 h-14 text-lg rounded-xl"
+                button={{ label: 'Search', className: 'absolute right-2 top-1/2 -translate-y-1/2 bg-brand-gradient hover:opacity-90' }}
+              />
             </div>
 
             {/* Category Shortcuts */}
