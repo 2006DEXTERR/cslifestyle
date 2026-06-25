@@ -2,6 +2,7 @@ import { Prisma, type SearchEntityType, type SearchIndexEntry } from '@prisma/cl
 import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 import { expandTerms } from './synonym.service';
+import { tokenize as relTokenize, likeFragments, relevanceScore, type SearchDoc } from '../../lib/search';
 
 /**
  * Advanced search (Phase 11) over the unified `SearchIndexEntry`. Tokenises + synonym-
@@ -141,20 +142,75 @@ export async function advancedSearch(input: AdvancedSearchInput, ipHash?: string
   return { query: input.q, expandedTerms: terms, total, groups, hits, suggestions, didYouMean };
 }
 
-/** Autocomplete suggestions (prefix/contains on indexed titles) + trending fallback. */
-export async function searchSuggestions(q: string, limit = 8): Promise<string[]> {
-  const term = q.trim().toLowerCase();
-  if (term.length < 2) return trendingTerms(limit);
-  const rows = await prisma.searchIndexEntry.findMany({
-    where: { title: { contains: term, mode: 'insensitive' } },
-    select: { title: true, boost: true },
-    orderBy: { boost: 'desc' },
-    take: 30,
-  });
-  const titles = rows
-    .map((r) => r.title)
-    .sort((a, b) => Number(b.toLowerCase().startsWith(term)) - Number(a.toLowerCase().startsWith(term)));
-  return [...new Set(titles)].slice(0, limit);
+/** Predictive autocomplete suggestion, tagged with its source so the UI can group it. */
+export type SuggestionType = 'product' | 'category' | 'brand' | 'guide' | 'comparison' | 'popular';
+export interface SearchSuggestion {
+  label: string;
+  type: SuggestionType;
+}
+
+/**
+ * Predictive autocomplete suggestions sourced ONLY from existing DB content — category &
+ * brand names, product / guide / comparison titles, and previous valid search queries
+ * (`popular`). Matching is word-boundary safe (so "phone" never suggests a "headphone")
+ * with a strong prefix boost for next-word completion (typing "lap" → "Laptops"). Capped
+ * at `limit` (max 8). Empty/too-short queries fall back to trending past searches.
+ */
+export async function searchSuggestions(q: string, limit = 8): Promise<SearchSuggestion[]> {
+  const cap = Math.min(limit, 8);
+  const term = q.trim();
+  const trendingFallback = async (): Promise<SearchSuggestion[]> =>
+    (await trendingTerms(cap)).map((t) => ({ label: t, type: 'popular' as const }));
+
+  if (relTokenize(term).length === 0) return trendingFallback();
+  const fragments = likeFragments(term);
+  if (!fragments.length) return trendingFallback();
+  const like = (f: string) => ({ contains: f, mode: 'insensitive' as const });
+
+  const [categories, brands, products, guides, comparisons, recent] = await Promise.all([
+    prisma.category.findMany({ where: { isActive: true, OR: fragments.flatMap((f) => [{ name: like(f) }, { slug: like(f) }]) }, select: { name: true }, take: 20 }),
+    prisma.brand.findMany({ where: { isActive: true, OR: fragments.flatMap((f) => [{ name: like(f) }, { slug: like(f) }]) }, select: { name: true }, take: 20 }),
+    prisma.product.findMany({
+      where: { isPublished: true, OR: fragments.flatMap((f) => [{ title: like(f) }, { category: { is: { name: like(f) } } }, { brand: { is: { name: like(f) } } }]) },
+      select: { title: true, category: { select: { name: true } }, brand: { select: { name: true } } },
+      take: 40,
+    }),
+    prisma.guide.findMany({ where: { status: 'published', OR: fragments.map((f) => ({ title: like(f) })) }, select: { title: true }, take: 20 }),
+    prisma.comparison.findMany({ where: { status: 'published', OR: fragments.map((f) => ({ title: like(f) })) }, select: { title: true }, take: 20 }),
+    prisma.searchQuery.findMany({ where: { resultsCount: { gt: 0 }, OR: fragments.map((f) => ({ query: like(f) })) }, select: { query: true }, distinct: ['query'], orderBy: { createdAt: 'desc' }, take: 20 }),
+  ]);
+
+  // weight nudges short, high-value labels (category/brand/past query) above product titles.
+  const cands: { label: string; type: SuggestionType; doc: SearchDoc; weight: number }[] = [
+    ...categories.map((c) => ({ label: c.name, type: 'category' as const, doc: { title: c.name } as SearchDoc, weight: 5 })),
+    ...brands.map((b) => ({ label: b.name, type: 'brand' as const, doc: { title: b.name } as SearchDoc, weight: 4 })),
+    ...recent.map((r) => ({ label: r.query, type: 'popular' as const, doc: { title: r.query } as SearchDoc, weight: 3 })),
+    ...guides.map((g) => ({ label: g.title, type: 'guide' as const, doc: { title: g.title } as SearchDoc, weight: 2 })),
+    ...comparisons.map((c) => ({ label: c.title, type: 'comparison' as const, doc: { title: c.title } as SearchDoc, weight: 2 })),
+    ...products.map((p) => ({ label: p.title, type: 'product' as const, doc: { title: p.title, category: p.category?.name ?? null, brand: p.brand?.name ?? null } as SearchDoc, weight: 1 })),
+  ];
+
+  const lower = term.toLowerCase();
+  const scored = cands
+    .map((c) => {
+      const rel = relevanceScore(term, c.doc); // 0 ⇒ not a safe word-boundary match
+      const prefix = c.label.toLowerCase().startsWith(lower) ? 500 : 0; // next-word completion boost
+      return { label: c.label, type: c.type, key: rel + prefix + c.weight, ok: rel > 0 };
+    })
+    .filter((x) => x.ok)
+    .sort((a, b) => b.key - a.key || a.label.length - b.label.length);
+
+  // De-dupe case-insensitively, preserving the best-ranked source/type.
+  const seen = new Set<string>();
+  const out: SearchSuggestion[] = [];
+  for (const s of scored) {
+    const k = s.label.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ label: s.label, type: s.type });
+    if (out.length >= cap) break;
+  }
+  return out;
 }
 
 /** Trending search terms (most frequent non-empty queries, last 7 days). */

@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { ApiError } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentBrand, type PresentedBrand } from './presenters';
+import { likeFragments, rankBySearch } from '../../lib/search';
 import type { BrandListQuery, CreateBrandBody } from '../../validation/catalog.schemas';
 
 async function publishedCounts(): Promise<Map<string, number>> {
@@ -22,14 +23,30 @@ export async function listBrands(
 ): Promise<PresentedBrand[]> {
   const and: Prisma.BrandWhereInput[] = [];
   if (!canSeeInactive || query.status === 'active') and.push({ isActive: true });
-  if (query.q) and.push({ name: { contains: query.q, mode: 'insensitive' } });
+
+  const fragments = query.q ? likeFragments(query.q) : [];
+  if (query.q && fragments.length) {
+    and.push({
+      OR: fragments.flatMap((f) => [
+        { name: { contains: f, mode: 'insensitive' as const } },
+        { slug: { contains: f, mode: 'insensitive' as const } },
+        { description: { contains: f, mode: 'insensitive' as const } },
+      ]),
+    });
+  }
 
   const rows = await prisma.brand.findMany({
     where: and.length ? { AND: and } : {},
     orderBy: { name: 'asc' },
   });
   const counts = await publishedCounts();
-  return rows.map((b) => presentBrand(b, counts.get(b.id) ?? 0));
+
+  // Rank text searches by relevance (word-boundary); plain listing stays alphabetical.
+  const ordered =
+    query.q && fragments.length
+      ? rankBySearch(query.q, rows, (b) => ({ title: b.name, slug: b.slug, keywords: b.description ?? '' }))
+      : rows;
+  return ordered.map((b) => presentBrand(b, counts.get(b.id) ?? 0));
 }
 
 export async function getBrandBySlug(

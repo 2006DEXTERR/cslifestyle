@@ -4,7 +4,10 @@ import { ApiError } from '../../lib/http';
 import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentComparison, type PresentedComparison } from './presenters';
+import { likeFragments, rankBySearch } from '../../lib/search';
 import type { ComparisonListQuery, CreateComparisonBody } from '../../validation/content.schemas';
+
+const SEARCH_CANDIDATE_CAP = 400;
 
 const PRODUCT_REL = { include: { category: true, brand: true, images: true } } as const;
 const FULL_INCLUDE = {
@@ -19,15 +22,20 @@ function buildWhere(q: ComparisonListQuery, canSeeUnpublished: boolean): Prisma.
   const status = canSeeUnpublished ? q.status : 'published';
   if (status === 'published') and.push({ status: 'published' });
   else if (status === 'draft') and.push({ status: 'draft' });
-  if (q.q) {
-    and.push({
-      OR: [
-        { title: { contains: q.q, mode: 'insensitive' } },
-        { excerpt: { contains: q.q, mode: 'insensitive' } },
-      ],
-    });
-  }
   return and.length ? { AND: and } : {};
+}
+
+/** Coarse DB recall filter for comparison text search (precision enforced in JS ranking). */
+function searchRecallWhere(fragments: string[]): Prisma.ComparisonWhereInput {
+  return {
+    OR: fragments.flatMap((f) => [
+      { title: { contains: f, mode: 'insensitive' as const } },
+      { slug: { contains: f, mode: 'insensitive' as const } },
+      { excerpt: { contains: f, mode: 'insensitive' as const } },
+      { productA: { is: { title: { contains: f, mode: 'insensitive' as const } } } },
+      { productB: { is: { title: { contains: f, mode: 'insensitive' as const } } } },
+    ]),
+  };
 }
 
 function buildOrderBy(sort: ComparisonListQuery['sort']): Prisma.ComparisonOrderByWithRelationInput[] {
@@ -46,18 +54,45 @@ export async function listComparisons(
   query: ComparisonListQuery,
   canSeeUnpublished: boolean,
 ): Promise<{ items: PresentedComparison[]; pagination: Pagination }> {
-  const where = buildWhere(query, canSeeUnpublished);
+  const baseWhere = buildWhere(query, canSeeUnpublished);
   const skip = (query.page - 1) * query.perPage;
+  const fragments = query.q ? likeFragments(query.q) : [];
+
+  // Relevance-ranked text search (drafts already excluded by buildWhere for public callers).
+  if (query.q && fragments.length) {
+    const where: Prisma.ComparisonWhereInput = { AND: [baseWhere, searchRecallWhere(fragments)] };
+    const candidates = await prisma.comparison.findMany({ where, include: LIST_INCLUDE, take: SEARCH_CANDIDATE_CAP });
+    const ranked = rankBySearch(
+      query.q,
+      candidates,
+      (row) => ({
+        title: row.title,
+        slug: row.slug,
+        keywords: [row.excerpt ?? '', row.productA?.title ?? '', row.productB?.title ?? ''].join(' '),
+      }),
+      (a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0),
+    );
+    const total = ranked.length;
+    return {
+      items: ranked.slice(skip, skip + query.perPage).map(presentComparison),
+      pagination: {
+        page: query.page,
+        perPage: query.perPage,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.perPage)),
+      },
+    };
+  }
 
   const [rows, total] = await prisma.$transaction([
     prisma.comparison.findMany({
-      where,
+      where: baseWhere,
       include: LIST_INCLUDE,
       orderBy: buildOrderBy(query.sort),
       skip,
       take: query.perPage,
     }),
-    prisma.comparison.count({ where }),
+    prisma.comparison.count({ where: baseWhere }),
   ]);
 
   return {

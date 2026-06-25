@@ -263,4 +263,75 @@ describe.skipIf(!RUN)('catalog integration (DB)', () => {
     expect(res.body.data.products.length).toBe(0);
     expect(res.body.data.categories.length).toBeGreaterThan(0);
   });
+
+  // ── relevance: the bugs this audit fixed ──
+  it('"laptop" returns ALL laptop products (category match, not just title)', async () => {
+    // Laptops in the seed are model-named (e.g. "Acer Aspire") — a naive title-substring
+    // search returned ~1. Category-aware ranking must surface the whole category.
+    const res = await request(app).get('/api/products?q=laptop&perPage=50');
+    expect(res.status).toBe(200);
+    const items = res.body.data as Array<{ categorySlug: string }>;
+    const laptops = items.filter((p) => p.categorySlug === 'laptops');
+    // The bug returned a single title-substring hit; category ranking returns the set.
+    expect(laptops.length).toBeGreaterThanOrEqual(2);
+    // …and nothing from unrelated categories leaked in.
+    expect(items.every((p) => p.categorySlug === 'laptops')).toBe(true);
+  });
+
+  it('"laptops" (plural) matches the same products as "laptop"', async () => {
+    const singular = await request(app).get('/api/products?q=laptop&perPage=50');
+    const plural = await request(app).get('/api/products?q=laptops&perPage=50');
+    expect(plural.body.meta.pagination.total).toBe(singular.body.meta.pagination.total);
+  });
+
+  it('"phone" matches smartphones but NEVER headphones (word boundary)', async () => {
+    const res = await request(app).get('/api/products?q=phone&perPage=50');
+    expect(res.status).toBe(200);
+    const items = res.body.data as Array<{ categorySlug: string; title: string }>;
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.some((p) => p.categorySlug === 'smartphones')).toBe(true);
+    expect(items.some((p) => p.categorySlug === 'earbuds')).toBe(false); // "Earbuds & Headphones"
+    expect(items.some((p) => /headphone/i.test(p.title))).toBe(false);
+  });
+
+  it('multi-word query intersects tokens (still safe, no headphones)', async () => {
+    const res = await request(app).get('/api/products?q=android%20phone&perPage=50');
+    expect(res.status).toBe(200);
+    const items = res.body.data as Array<{ categorySlug: string }>;
+    expect(items.every((p) => p.categorySlug !== 'earbuds')).toBe(true);
+  });
+
+  it('public search never returns draft/unpublished products', async () => {
+    const res = await request(app).get('/api/products?q=laptop&status=draft&perPage=50');
+    // status=draft is ignored for anonymous callers; results stay published-only.
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  // ── predictive autocomplete suggestions (DB-sourced, typed, capped, word-boundary safe) ──
+  type Suggestion = { label: string; type: string };
+  const TYPES = ['product', 'category', 'brand', 'guide', 'comparison', 'popular'];
+
+  it('suggestions are typed/grouped, DB-sourced, cap at 8, and exclude unrelated substrings', async () => {
+    const res = await request(app).get('/api/search/suggestions?q=laptop');
+    expect(res.status).toBe(200);
+    const sugg = res.body.data as Suggestion[];
+    expect(Array.isArray(sugg)).toBe(true);
+    expect(sugg.length).toBeGreaterThan(0);
+    expect(sugg.length).toBeLessThanOrEqual(8);
+    // Every suggestion carries a known group type and a non-empty label (DB content).
+    expect(sugg.every((s) => TYPES.includes(s.type) && typeof s.label === 'string' && s.label.length > 0)).toBe(true);
+    // "laptop" should surface the Laptops category as a prediction.
+    expect(sugg.some((s) => s.type === 'category' && /laptop/i.test(s.label))).toBe(true);
+
+    const phone = (await request(app).get('/api/search/suggestions?q=phone')).body.data as Suggestion[];
+    expect(phone.every((s) => !/headphone/i.test(s.label))).toBe(true); // no headphone for "phone"
+  });
+
+  it('predictive prefix: "lap" completes to the Laptops category', async () => {
+    const res = await request(app).get('/api/search/suggestions?q=lap');
+    expect(res.status).toBe(200);
+    const sugg = res.body.data as Suggestion[];
+    expect(sugg.some((s) => /^lap/i.test(s.label))).toBe(true); // next-word completion
+  });
 });

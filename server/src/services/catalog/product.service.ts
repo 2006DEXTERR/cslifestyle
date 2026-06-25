@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/http';
 import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentProduct, type PresentedProduct } from './presenters';
+import { likeFragments, rankBySearch } from '../../lib/search';
 import type {
   ProductListQuery,
   CreateProductBody,
@@ -11,7 +12,13 @@ import type {
 } from '../../validation/catalog.schemas';
 
 const PRODUCT_INCLUDE = { category: true, brand: true, images: true } as const;
+type ProductRow = Prisma.ProductGetPayload<{ include: typeof PRODUCT_INCLUDE }>;
 
+// Hard cap on candidates pulled for relevance ranking — keeps q-search O(1) on memory
+// while comfortably covering the catalog. Precision is enforced in JS scoring.
+const SEARCH_CANDIDATE_CAP = 400;
+
+/** Build the non-text filters (status/category/brand/price/flags). Text `q` is ranked separately. */
 function buildWhere(q: ProductListQuery): Prisma.ProductWhereInput {
   const and: Prisma.ProductWhereInput[] = [];
 
@@ -26,16 +33,41 @@ function buildWhere(q: ProductListQuery): Prisma.ProductWhereInput {
   if (q.trending) and.push({ isTrending: true });
   if (q.editorsPick) and.push({ isEditorsPick: true });
   if (q.deals) and.push({ NOT: { dealExpiresIn: null } });
-  if (q.q) {
-    and.push({
-      OR: [
-        { title: { contains: q.q, mode: 'insensitive' } },
-        { shortDescription: { contains: q.q, mode: 'insensitive' } },
-      ],
-    });
-  }
 
   return and.length ? { AND: and } : {};
+}
+
+/** Coarse DB recall filter: any candidate matching ANY query fragment in a searchable column. */
+function searchRecallWhere(fragments: string[]): Prisma.ProductWhereInput {
+  return {
+    OR: fragments.flatMap((f) => [
+      { title: { contains: f, mode: 'insensitive' as const } },
+      { slug: { contains: f, mode: 'insensitive' as const } },
+      { shortDescription: { contains: f, mode: 'insensitive' as const } },
+      { description: { contains: f, mode: 'insensitive' as const } },
+      { category: { is: { name: { contains: f, mode: 'insensitive' as const } } } },
+      { brand: { is: { name: { contains: f, mode: 'insensitive' as const } } } },
+    ]),
+  };
+}
+
+/** Flatten a product's weak searchable text (specs/highlights/features/description) for scoring. */
+function productKeywords(row: ProductRow): string {
+  const parts: string[] = [];
+  if (row.shortDescription) parts.push(row.shortDescription);
+  const strs = (v: Prisma.JsonValue | null | undefined): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  const vals = (v: Prisma.JsonValue | null | undefined): string[] =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.values(v).filter((x): x is string => typeof x === 'string')
+      : [];
+  parts.push(...strs(row.highlights));
+  parts.push(...vals(row.features));
+  const specs = row.specifications;
+  if (specs && typeof specs === 'object' && !Array.isArray(specs)) {
+    for (const group of Object.values(specs)) parts.push(...vals(group));
+  }
+  return parts.join(' ');
 }
 
 function buildOrderBy(sort?: ProductListQuery['sort']): Prisma.ProductOrderByWithRelationInput {
@@ -60,18 +92,55 @@ export async function listProducts(
 ): Promise<{ items: PresentedProduct[]; pagination: Pagination }> {
   // Non-privileged callers may never see drafts regardless of the requested status.
   const status = canSeeUnpublished ? query.status : 'published';
-  const where = buildWhere({ ...query, status });
+  const baseWhere = buildWhere({ ...query, status });
   const skip = (query.page - 1) * query.perPage;
+  const fragments = query.q ? likeFragments(query.q) : [];
 
+  // ── Relevance-ranked text search (q) ──
+  // Pull a candidate set (base filters + coarse recall), then rank precisely in JS with
+  // word-boundary/token matching so "laptop" finds the whole category and "phone" never
+  // matches "headphone". Drafts are excluded via baseWhere (never leak in public search).
+  if (query.q && fragments.length) {
+    const where: Prisma.ProductWhereInput = { AND: [baseWhere, searchRecallWhere(fragments)] };
+    const candidates = await prisma.product.findMany({
+      where,
+      include: PRODUCT_INCLUDE,
+      take: SEARCH_CANDIDATE_CAP,
+    });
+    const ranked = rankBySearch(
+      query.q,
+      candidates,
+      (row) => ({
+        title: row.title,
+        slug: row.slug,
+        category: row.category?.name ?? null,
+        brand: row.brand?.name ?? null,
+        keywords: productKeywords(row),
+      }),
+      (a, b) => b.reviewCount - a.reviewCount || b.rating - a.rating,
+    );
+    const total = ranked.length;
+    return {
+      items: ranked.slice(skip, skip + query.perPage).map(presentProduct),
+      pagination: {
+        page: query.page,
+        perPage: query.perPage,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.perPage)),
+      },
+    };
+  }
+
+  // ── Plain browse/filter (no text query) ──
   const [rows, total] = await prisma.$transaction([
     prisma.product.findMany({
-      where,
+      where: baseWhere,
       include: PRODUCT_INCLUDE,
       orderBy: buildOrderBy(query.sort),
       skip,
       take: query.perPage,
     }),
-    prisma.product.count({ where }),
+    prisma.product.count({ where: baseWhere }),
   ]);
 
   return {

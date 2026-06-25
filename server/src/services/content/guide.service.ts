@@ -4,7 +4,10 @@ import { ApiError } from '../../lib/http';
 import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentGuide, type PresentedGuide } from './presenters';
+import { likeFragments, rankBySearch } from '../../lib/search';
 import type { GuideListQuery, CreateGuideBody } from '../../validation/content.schemas';
+
+const SEARCH_CANDIDATE_CAP = 400;
 
 const FULL_INCLUDE = {
   category: true,
@@ -19,15 +22,19 @@ function buildWhere(q: GuideListQuery, canSeeUnpublished: boolean): Prisma.Guide
   else if (status === 'draft') and.push({ status: 'draft' });
   if (q.category) and.push({ OR: [{ categoryId: q.category }, { category: { slug: q.category } }] });
   if (q.author) and.push({ OR: [{ authorId: q.author }, { author: { slug: q.author } }] });
-  if (q.q) {
-    and.push({
-      OR: [
-        { title: { contains: q.q, mode: 'insensitive' } },
-        { excerpt: { contains: q.q, mode: 'insensitive' } },
-      ],
-    });
-  }
   return and.length ? { AND: and } : {};
+}
+
+/** Coarse DB recall filter for guide text search (precision enforced later in JS ranking). */
+function searchRecallWhere(fragments: string[]): Prisma.GuideWhereInput {
+  return {
+    OR: fragments.flatMap((f) => [
+      { title: { contains: f, mode: 'insensitive' as const } },
+      { slug: { contains: f, mode: 'insensitive' as const } },
+      { excerpt: { contains: f, mode: 'insensitive' as const } },
+      { category: { is: { name: { contains: f, mode: 'insensitive' as const } } } },
+    ]),
+  };
 }
 
 function buildOrderBy(sort: GuideListQuery['sort']): Prisma.GuideOrderByWithRelationInput[] {
@@ -46,18 +53,50 @@ export async function listGuides(
   query: GuideListQuery,
   canSeeUnpublished: boolean,
 ): Promise<{ items: PresentedGuide[]; pagination: Pagination }> {
-  const where = buildWhere(query, canSeeUnpublished);
+  const baseWhere = buildWhere(query, canSeeUnpublished);
   const skip = (query.page - 1) * query.perPage;
+  const fragments = query.q ? likeFragments(query.q) : [];
+
+  // Relevance-ranked text search (drafts already excluded by buildWhere for public callers).
+  if (query.q && fragments.length) {
+    const where: Prisma.GuideWhereInput = { AND: [baseWhere, searchRecallWhere(fragments)] };
+    const candidates = await prisma.guide.findMany({
+      where,
+      include: { category: true, author: true },
+      take: SEARCH_CANDIDATE_CAP,
+    });
+    const ranked = rankBySearch(
+      query.q,
+      candidates,
+      (row) => ({
+        title: row.title,
+        slug: row.slug,
+        category: row.category?.name ?? null,
+        keywords: row.excerpt ?? '',
+      }),
+      (a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0),
+    );
+    const total = ranked.length;
+    return {
+      items: ranked.slice(skip, skip + query.perPage).map(presentGuide),
+      pagination: {
+        page: query.page,
+        perPage: query.perPage,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.perPage)),
+      },
+    };
+  }
 
   const [rows, total] = await prisma.$transaction([
     prisma.guide.findMany({
-      where,
+      where: baseWhere,
       include: { category: true, author: true },
       orderBy: buildOrderBy(query.sort),
       skip,
       take: query.perPage,
     }),
-    prisma.guide.count({ where }),
+    prisma.guide.count({ where: baseWhere }),
   ]);
 
   return {

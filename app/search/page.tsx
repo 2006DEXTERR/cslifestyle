@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Clock, TrendingUp, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -27,7 +28,7 @@ const recentSearches = [
   'Air conditioner guide',
 ];
 
-export default function SearchPage() {
+function SearchPageInner() {
   // Real trending terms (Phase 11), with a static fallback so the chips never empty.
   const [trendingSearches, setTrendingSearches] = React.useState<string[]>(defaultTrendingSearches);
   React.useEffect(() => {
@@ -35,11 +36,13 @@ export default function SearchPage() {
   }, []);
 
   const [query, setQuery] = React.useState('');
-  // Seed the query from the URL (?q=) so navbar/homepage searches land with results.
+  // Hydrate the query from the URL (?q=) reactively, so a fresh navbar/homepage search
+  // updates results even when we're already on /search (client navigation, no remount).
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get('q') ?? '';
   React.useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get('q');
-    if (q) setQuery(q);
-  }, []);
+    setQuery(urlQuery);
+  }, [urlQuery]);
   const [activeTab, setActiveTab] = React.useState<'all' | 'products' | 'guides' | 'comparisons' | 'brands'>('all');
   const [isSearching, setIsSearching] = React.useState(false);
   const [results, setResults] = React.useState<{
@@ -334,5 +337,14 @@ export default function SearchPage() {
         </section>
       )}
     </div>
+  );
+}
+
+// useSearchParams must sit under a Suspense boundary for the route to build cleanly.
+export default function SearchPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <SearchPageInner />
+    </React.Suspense>
   );
 }

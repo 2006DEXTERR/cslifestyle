@@ -23,6 +23,13 @@ export class DiscoveryApiError extends Error {
 
 export type SearchEntityType = 'product' | 'category' | 'brand' | 'guide' | 'comparison' | 'author';
 
+/** Predictive autocomplete suggestion (DB-sourced), tagged with its source for grouping. */
+export type SuggestionType = 'product' | 'category' | 'brand' | 'guide' | 'comparison' | 'popular';
+export interface SearchSuggestion {
+  label: string;
+  type: SuggestionType;
+}
+
 export interface SearchHit {
   entityType: SearchEntityType;
   entityId: string;
@@ -81,7 +88,7 @@ export const discoveryApi = {
   // Public
   advancedSearch: (q: string, opts: { types?: string; limit?: number } = {}) =>
     request<AdvancedSearchResult>(`/search/advanced${qs({ q, ...opts })}`, { method: 'GET' }),
-  suggestions: (q: string) => request<string[]>(`/search/suggestions${qs({ q })}`, { method: 'GET' }),
+  suggestions: (q: string) => request<SearchSuggestion[]>(`/search/suggestions${qs({ q })}`, { method: 'GET' }),
   trending: () => request<string[]>('/search/trending', { method: 'GET' }),
 
   // Admin: synonyms (search.manage)
