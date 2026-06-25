@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Campaign } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
-import { env } from '../../config/env';
+import { env, isProd, isDev } from '../../config/env';
 import { sha256 } from '../../lib/tokens';
 import { sendMarketingEmail } from './email';
 import {
@@ -40,11 +40,53 @@ const clickUrl = (recipientId: string, target: string): string =>
 
 // ── Lifecycle ──
 
-export async function sendVerificationFor(subscriberId: string, token: string): Promise<void> {
+/**
+ * Pre-flight check: can a confirmation email be sent/queued *before* we write any
+ * subscriber/token rows? Mirrors {@link sendVerificationFor} / dispatchVerificationEmail:
+ *   - bullmq → always queued (true), the worker delivers it.
+ *   - RESEND_API_KEY present → we attempt a real send (true).
+ *   - inline + no key → only dev/test are offline-safe (true); production returns false
+ *     so the caller can fail fast without creating an orphaned pending subscriber.
+ */
+export function canQueueVerificationEmail(): boolean {
+  if (env.QUEUE_DRIVER === 'bullmq' || env.RESEND_API_KEY) return true;
+  return !isProd;
+}
+
+/**
+ * Send the double-opt-in confirmation email. Returns true only when the email was
+ * actually sent (or, in dev/test, safely accounted for) — false means the caller
+ * must NOT report success. Behaviour when no real provider is configured
+ * (RESEND_API_KEY unset → console fallback):
+ *   - production: returns false + logs a clear (non-secret) error — never pretend.
+ *   - development: logs the confirmation URL so you can complete the flow, returns true.
+ *   - test/other: returns true (offline-safe, like the rest of the suite).
+ */
+export async function sendVerificationFor(subscriberId: string, token: string): Promise<boolean> {
   const sub = await prisma.newsletterSubscriber.findUnique({ where: { id: subscriberId } });
-  if (!sub) return;
-  const tpl = verifySubscriptionEmail(verifyUrl(token));
-  await sendMarketingEmail({ to: sub.email, ...tpl });
+  if (!sub) return false;
+  const url = verifyUrl(token);
+
+  if (!env.RESEND_API_KEY) {
+    if (isProd) {
+      logger.error(
+        { to: sub.email },
+        '[newsletter] RESEND_API_KEY not configured — confirmation email NOT sent (set RESEND_API_KEY + EMAIL_FROM)',
+      );
+      return false;
+    }
+    if (isDev) {
+      logger.warn(
+        { to: sub.email, confirmUrl: url },
+        '[newsletter] RESEND_API_KEY not set — DEV confirmation link (email NOT actually sent)',
+      );
+    }
+    return true; // dev/test: offline-safe
+  }
+
+  const ok = await sendMarketingEmail({ to: sub.email, ...verifySubscriptionEmail(url) });
+  if (!ok) logger.error({ to: sub.email }, '[newsletter] confirmation email failed to send via Resend');
+  return ok;
 }
 
 export async function sendWelcomeFor(subscriberId: string): Promise<void> {

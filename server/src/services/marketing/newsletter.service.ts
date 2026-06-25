@@ -3,8 +3,8 @@ import { prisma } from '../../lib/prisma';
 import { ApiError, type Pagination } from '../../lib/http';
 import { sha256 } from '../../lib/tokens';
 import { env } from '../../config/env';
-import { dispatchMarketingJob } from '../../queues/marketingQueue';
-import { newVerifyToken, newUnsubscribeToken } from './delivery';
+import { dispatchMarketingJob, dispatchVerificationEmail } from '../../queues/marketingQueue';
+import { newVerifyToken, newUnsubscribeToken, canQueueVerificationEmail } from './delivery';
 
 /**
  * Newsletter subscribe / double opt-in / unsubscribe + subscriber management (Phase 9).
@@ -62,12 +62,30 @@ export async function subscribe(input: SubscribeInput): Promise<SubscribeResult>
     return { status: 'active', subscriber: presentSubscriber(sub) };
   }
 
-  // Double opt-in → pending + verification email.
+  // Double opt-in → pending + verification email. Fail fast BEFORE writing any
+  // subscriber/token rows if we already know the confirmation email can't be sent
+  // (production with no email provider configured) — no orphaned pending row.
+  if (!canQueueVerificationEmail()) {
+    throw new ApiError(
+      503,
+      'Newsletter sign-up is temporarily unavailable. Please try again later.',
+    );
+  }
+
   const { token, hash } = newVerifyToken();
   const sub = existing
     ? await prisma.newsletterSubscriber.update({ where: { id: existing.id }, data: { status: 'pending', verifyTokenHash: hash, verifiedAt: null, unsubscribedAt: null, source: input.source ?? existing.source, ...(tags ? { tags } : {}) } })
     : await prisma.newsletterSubscriber.create({ data: { email, status: 'pending', verifyTokenHash: hash, source: input.source ?? 'api', tags: tags ?? [], unsubscribeToken: newUnsubscribeToken() } });
-  await dispatchMarketingJob({ type: 'verification', subscriberId: sub.id, token });
+  // Only report "check your inbox" if the confirmation email actually went out
+  // (or was queued). In production with no email provider configured this returns
+  // false → we surface a clear, non-secret error instead of pretending.
+  const emailSent = await dispatchVerificationEmail(sub.id, token);
+  if (!emailSent) {
+    throw new ApiError(
+      503,
+      'Subscription saved, but the confirmation email could not be sent right now. Please try again later.',
+    );
+  }
   return { status: 'pending', subscriber: presentSubscriber(sub) };
 }
 

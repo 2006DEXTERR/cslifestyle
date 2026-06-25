@@ -22,7 +22,8 @@ export type MarketingJob =
 export async function runMarketingJob(job: MarketingJob): Promise<void> {
   switch (job.type) {
     case 'verification':
-      return sendVerificationFor(job.subscriberId, job.token);
+      await sendVerificationFor(job.subscriberId, job.token);
+      return;
     case 'welcome':
       return sendWelcomeFor(job.subscriberId);
     case 'campaign-send':
@@ -50,4 +51,20 @@ export async function dispatchMarketingJob(job: MarketingJob): Promise<void> {
   } else {
     await runMarketingJob(job);
   }
+}
+
+/**
+ * Dispatch the newsletter confirmation email and report whether it was sent/queued.
+ * Inline mode runs it now and returns the real send result; bullmq mode enqueues and
+ * returns true (queued — the worker delivers it). Callers use this to avoid telling a
+ * subscriber "check your inbox" when no email actually went out.
+ */
+export async function dispatchVerificationEmail(subscriberId: string, token: string): Promise<boolean> {
+  if (env.QUEUE_DRIVER === 'bullmq') {
+    const { getMarketingQueue } = await import('./marketingBullmq');
+    await getMarketingQueue().add('verification', { type: 'verification', subscriberId, token } satisfies MarketingJob);
+    logger.info({ type: 'verification' }, 'marketing job enqueued (bullmq)');
+    return true;
+  }
+  return sendVerificationFor(subscriberId, token);
 }
