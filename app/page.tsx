@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SearchAutocomplete } from '@/components/search/SearchAutocomplete';
+import { FeaturedProductsCarousel } from '@/components/home/FeaturedProductsCarousel';
 import { ProductCard } from '@/components/products/ProductCard';
 import { CategoryCard } from '@/components/categories/CategoryCard';
 import { GuideCard } from '@/components/guides/GuideCard';
@@ -58,6 +59,15 @@ export default function Home() {
   const [buyingGuides, setBuyingGuides] = React.useState<ContentGuide[]>([]);
   const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
   const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
+
+  // Featured carousel set, built from already-fetched products (no extra request):
+  // curated editor's picks → trending → latest published, de-duplicated.
+  const featuredProducts = React.useMemo(() => {
+    const seen = new Set<string>();
+    return [...editorsPicks, ...trendingProducts, ...products]
+      .filter((p) => p && !seen.has(p.id) && (seen.add(p.id), true))
+      .slice(0, 10);
+  }, [editorsPicks, trendingProducts, products]);
 
   React.useEffect(() => {
     let active = true;
@@ -162,6 +172,9 @@ export default function Home() {
                 button={{ label: 'Search', className: 'absolute right-2 top-1/2 -translate-y-1/2 bg-brand-gradient hover:opacity-90' }}
               />
             </div>
+
+            {/* Featured Products Carousel — below the hero search, above category chips */}
+            <FeaturedProductsCarousel products={featuredProducts} />
 
             {/* Category Shortcuts */}
             <div className="flex flex-wrap items-center justify-center gap-2">
