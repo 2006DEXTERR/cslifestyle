@@ -13,6 +13,7 @@ import {
 } from '../validation/admin.schemas';
 import * as access from '../controllers/admin/access.controller';
 import * as settings from '../controllers/admin/settings.controller';
+import * as overview from '../controllers/admin/overview.controller';
 
 /**
  * Admin management router — mounted at `/api` (Phase 13). Wires the previously
@@ -22,6 +23,23 @@ import * as settings from '../controllers/admin/settings.controller';
  * read/write the existing User/Role/Permission/Session/Setting tables.
  */
 export const adminRouter = Router();
+
+// ──────────────────────── Dashboard ──────────────────────
+
+/**
+ * @openapi
+ * /api/admin/overview:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Admin dashboard overview — live entity counts, recent activity, category distribution and small time-series (requires admin.access).
+ *     responses: { 200: { description: Live dashboard overview } }
+ */
+adminRouter.get(
+  '/admin/overview',
+  authenticate,
+  requirePermission('admin.access'),
+  asyncHandler(overview.getOverview),
+);
 
 // ───────────────────────── Users ─────────────────────────
 

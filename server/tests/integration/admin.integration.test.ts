@@ -146,4 +146,32 @@ describe.skipIf(!RUN)('admin management integration (DB)', () => {
     expect(res.body.data.byType.products).toBeGreaterThanOrEqual(1);
     expect(res.body.data.sitemapUrl).toBe('/sitemap.xml');
   });
+
+  // ── Dashboard overview ──
+  it('requires auth for the dashboard overview', async () => {
+    expect((await request(app).get('/api/admin/overview')).status).toBe(401);
+  });
+
+  it('forbids a plain user from the dashboard overview', async () => {
+    const { agent } = await userSession();
+    expect((await agent.get('/api/admin/overview')).status).toBe(403);
+  });
+
+  it('admin reads live dashboard overview counts (Prisma aggregation, no mock)', async () => {
+    const { agent } = await adminSession();
+    const res = await agent.get('/api/admin/overview');
+    expect(res.status).toBe(200);
+    const d = res.body.data;
+    // Live counts derived from the seeded catalog.
+    expect(d.counts.products.total).toBeGreaterThanOrEqual(1);
+    expect(d.counts.products.published + d.counts.products.draft).toBe(d.counts.products.total);
+    expect(d.counts.categories).toBeGreaterThanOrEqual(1);
+    expect(d.counts.users).toBeGreaterThanOrEqual(1);
+    expect(d.counts.roles).toBeGreaterThanOrEqual(1);
+    // Shapes for the charts/lists.
+    expect(Array.isArray(d.categoryDistribution)).toBe(true);
+    expect(Array.isArray(d.recentProducts)).toBe(true);
+    expect(d.contentGrowth).toHaveLength(6);
+    expect(d.affiliateClicksDaily).toHaveLength(7);
+  });
 });

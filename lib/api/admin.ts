@@ -60,6 +60,25 @@ export interface SitemapStatus {
   robotsUrl: string;
 }
 
+export interface AdminOverview {
+  counts: {
+    products: { total: number; published: number; draft: number };
+    categories: number;
+    brands: number;
+    guides: { total: number; published: number; draft: number };
+    comparisons: number;
+    authors: number;
+    users: number;
+    roles: number;
+    subscribers: number;
+  };
+  categoryDistribution: { name: string; value: number }[];
+  recentProducts: { id: string; title: string; slug: string; category: string; isPublished: boolean }[];
+  recentGuides: { id: string; title: string; slug: string; author: string; status: string }[];
+  contentGrowth: { month: string; products: number; guides: number; comparisons: number }[];
+  affiliateClicksDaily: { day: string; clicks: number }[];
+}
+
 export interface UserListParams {
   page?: number;
   perPage?: number;
@@ -98,6 +117,9 @@ function qs(params: Record<string, unknown>): string {
 }
 
 export const adminApi = {
+  // ── Dashboard (admin.access) ──
+  getOverview: () => request<AdminOverview>('/admin/overview', { method: 'GET' }),
+
   // ── Users (users.view / users.edit) ──
   listUsers: async (params: UserListParams = {}) => {
     const env = await raw<AdminUser[]>(`/users${qs(params as Record<string, unknown>)}`, { method: 'GET' });
