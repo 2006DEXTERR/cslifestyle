@@ -12,6 +12,7 @@ import {
   createTemplateSchema,
 } from '../validation/import.schemas';
 import * as ctrl from '../controllers/import/import.controller';
+import * as apiCtrl from '../controllers/import/api-import.controller';
 
 /**
  * Import Center API (mounted at `/api`). Reads need `import.view`; creating jobs
@@ -21,6 +22,28 @@ import * as ctrl from '../controllers/import/import.controller';
 export const importRouter = Router();
 
 const view = [authenticate, requirePermission('import.view')] as const;
+
+// ───────────────── Import through API (PA-API — no scraping) ─────────────────
+
+/**
+ * @openapi
+ * /api/admin/import/api/config:
+ *   get: { tags: [Import], summary: API import provider readiness — no secret values (import.view), responses: { 200: { description: Readiness } } }
+ * /api/admin/import/api/history:
+ *   get: { tags: [Import], summary: Recent import history (import.view), responses: { 200: { description: History } } }
+ * /api/admin/import/api/start:
+ *   post: { tags: [Import], summary: Start an API import (PA-API SearchItems → review CSV; import.create). Fails clearly if credentials are missing — never scrapes, never publishes., responses: { 202: { description: Started }, 400: { description: Credentials not configured } } }
+ */
+importRouter.get('/admin/import/api/config', ...view, asyncHandler(apiCtrl.getApiConfig));
+importRouter.get('/admin/import/api/history', ...view, asyncHandler(apiCtrl.getApiHistory));
+importRouter.post(
+  '/admin/import/api/start',
+  authenticate,
+  requireCsrf,
+  requirePermission('import.create'),
+  auditLogger('import.api_start', 'import'),
+  asyncHandler(apiCtrl.startApiImport),
+);
 
 /**
  * @openapi

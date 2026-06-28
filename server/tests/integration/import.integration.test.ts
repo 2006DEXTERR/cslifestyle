@@ -137,4 +137,47 @@ describe.skipIf(!RUN)('import center integration (DB)', () => {
     expect(stats.body.data).toHaveProperty('successRate');
     expect(stats.body.data).toHaveProperty('completedJobs');
   });
+
+  // ── Import through API (PA-API) ──
+  it('config requires auth + import.view (401 unauth, 403 plain user)', async () => {
+    expect((await request(app).get('/api/admin/import/api/config')).status).toBe(401);
+    const user = await userSession();
+    expect((await user.agent.get('/api/admin/import/api/config')).status).toBe(403);
+  });
+
+  it('config reports readiness + missing credentials, never exposing secret values', async () => {
+    const { agent } = await adminSession();
+    const res = await agent.get('/api/admin/import/api/config');
+    expect(res.status).toBe(200);
+    const cfg = res.body.data;
+    expect(cfg.provider).toBe('amazon-paapi');
+    // No PA-API keys configured in the test env → not ready, lists the missing var NAMES.
+    expect(cfg.ready).toBe(false);
+    expect(cfg.missing).toEqual(expect.arrayContaining(['AMAZON_PAAPI_ACCESS_KEY', 'AMAZON_PAAPI_SECRET_KEY']));
+    // Never returns secret values / fields.
+    expect(cfg).not.toHaveProperty('accessKey');
+    expect(cfg).not.toHaveProperty('secretKey');
+    expect(JSON.stringify(cfg)).not.toMatch(/AKIA|secretKey|"secret"/i);
+  });
+
+  it('start requires import.create and a CSRF token', async () => {
+    expect((await request(app).post('/api/admin/import/api/start')).status).toBe(401);
+    const user = await userSession();
+    expect((await user.agent.post('/api/admin/import/api/start').set('x-csrf-token', user.csrf)).status).toBe(403);
+  });
+
+  it('start fails clearly when credentials are missing (no fake success)', async () => {
+    const { agent, csrf } = await adminSession();
+    const res = await agent.post('/api/admin/import/api/start').set('x-csrf-token', csrf);
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Amazon PA-API credentials are not configured.');
+  });
+
+  it('history is admin-only and returns existing import jobs', async () => {
+    expect((await request(app).get('/api/admin/import/api/history')).status).toBe(401);
+    const { agent } = await adminSession();
+    const res = await agent.get('/api/admin/import/api/history');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
 });

@@ -26,6 +26,7 @@ import {
   type ImportJob,
   type ImportStats,
   type CategoryInput,
+  type ApiImportConfig,
 } from '@/lib/api/import';
 
 const importTypes = [
@@ -75,6 +76,11 @@ export default function ImportCenterPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [resultJob, setResultJob] = useState<ImportJob | null>(null);
 
+  // Import through API (PA-API) state — readiness + run lifecycle (no secret values).
+  const [apiConfig, setApiConfig] = useState<ApiImportConfig | null>(null);
+  const [apiState, setApiState] = useState<'checking' | 'idle' | 'running' | 'completed' | 'failed'>('checking');
+  const [apiMessage, setApiMessage] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
     try {
       const [s, j] = await Promise.all([importApi.getStats(), importApi.listJobs({ perPage: 50 })]);
@@ -89,6 +95,38 @@ export default function ImportCenterPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // ── Import through API (PA-API) ──
+  const checkApiConfig = useCallback(async () => {
+    setApiState((s) => (s === 'running' ? s : 'checking'));
+    try {
+      const cfg = await importApi.getApiConfig();
+      setApiConfig(cfg);
+      setApiState((s) => (s === 'running' ? s : 'idle'));
+    } catch {
+      setApiState((s) => (s === 'running' ? s : 'idle'));
+    }
+  }, []);
+
+  const startApiImport = useCallback(async () => {
+    setApiState('running');
+    setApiMessage(null);
+    try {
+      const r = await importApi.startApiImport();
+      setApiState('completed');
+      setApiMessage(r.message);
+      void refresh();
+    } catch (err) {
+      // Surfaces the clear backend message (e.g. "Amazon PA-API credentials are not configured.")
+      setApiState('failed');
+      setApiMessage(err instanceof Error ? err.message : 'API import failed');
+      void checkApiConfig();
+    }
+  }, [refresh, checkApiConfig]);
+
+  useEffect(() => {
+    void checkApiConfig();
+  }, [checkApiConfig]);
 
   // Poll while there are in-flight jobs so progress bars stay live.
   const hasActive = jobs.some((j) => j.status === 'pending' || j.status === 'processing');
@@ -281,28 +319,129 @@ export default function ImportCenterPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+            className="space-y-6"
           >
-            {importTypes.map((type) => (
-              <button
-                key={type.id}
-                onClick={() => {
-                  resetWizard();
-                  setSelectedType(type.id);
-                  setShowImportWizard(true);
-                  setWizardStep(1);
-                }}
-                className="group rounded-xl border border-border bg-card p-6 text-left hover:border-brand-pink hover:shadow-md transition-all"
-              >
-                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center mb-4', type.color)}>
-                  <type.icon className="h-6 w-6 text-white" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {importTypes.map((type) => (
+                <button
+                  key={type.id}
+                  onClick={() => {
+                    resetWizard();
+                    setSelectedType(type.id);
+                    setShowImportWizard(true);
+                    setWizardStep(1);
+                  }}
+                  className="group rounded-xl border border-border bg-card p-6 text-left hover:border-brand-pink hover:shadow-md transition-all"
+                >
+                  <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center mb-4', type.color)}>
+                    <type.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="font-semibold text-foreground group-hover:text-brand-pink transition-colors">
+                    {type.name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">{type.description}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Import through API (PA-API) — readiness, run, and review-before-publish. */}
+            {(() => {
+              const ready = apiConfig?.ready ?? false;
+              const badge =
+                apiState === 'running'
+                  ? { label: 'Import running', cls: 'bg-blue-500/10 text-blue-600' }
+                  : apiState === 'completed'
+                    ? { label: 'Import completed', cls: 'bg-green-500/10 text-green-600' }
+                    : apiState === 'failed'
+                      ? { label: 'Import failed', cls: 'bg-red-500/10 text-red-600' }
+                      : apiState === 'checking'
+                        ? { label: 'Checking…', cls: 'bg-muted text-muted-foreground' }
+                        : ready
+                          ? { label: 'Ready', cls: 'bg-green-500/10 text-green-600' }
+                          : { label: 'Missing credentials', cls: 'bg-yellow-500/10 text-yellow-600' };
+              return (
+                <div className="rounded-xl border border-border bg-card p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-brand-gradient">
+                        <Activity className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">Import through API</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Fetch product data from approved API providers and review before publishing.
+                        </p>
+                      </div>
+                    </div>
+                    <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap', badge.cls)}>
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  {/* Missing-credentials blocked state — shows required var NAMES only (no secret values). */}
+                  {apiConfig && !ready && (
+                    <div className="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm">
+                      <div className="flex items-center gap-2 font-medium text-yellow-700">
+                        <AlertTriangle className="h-4 w-4" />
+                        Provider not configured — set these environment variables:
+                      </div>
+                      <ul className="mt-2 ml-6 list-disc text-muted-foreground">
+                        {(apiConfig.missing.length ? apiConfig.missing : apiConfig.required).map((v) => (
+                          <li key={v}><code>{v}</code></li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Provider: {apiConfig.provider} · Partner type: {apiConfig.partnerType} · Marketplace: {apiConfig.marketplace} · Region: {apiConfig.region}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Result / error message (no secrets). */}
+                  {apiMessage && (
+                    <div
+                      className={cn(
+                        'mt-4 rounded-lg p-3 text-sm',
+                        apiState === 'failed' ? 'bg-red-500/5 text-red-600' : 'bg-green-500/5 text-green-700',
+                      )}
+                    >
+                      {apiMessage}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={startApiImport}
+                      disabled={!ready || apiState === 'running' || apiState === 'checking'}
+                      className="inline-flex items-center gap-2 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    >
+                      <RefreshCw className={cn('h-4 w-4', apiState === 'running' && 'animate-spin')} />
+                      Start API Import
+                    </button>
+                    <button
+                      onClick={checkApiConfig}
+                      disabled={apiState === 'running'}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 transition-colors"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Check API Configuration
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('history')}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      <Clock className="h-4 w-4" />
+                      View Import History
+                    </button>
+                  </div>
+
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    PA-API only — never scrapes. Fetched results are written to <code>{apiConfig?.reviewFile ?? 'amazon-products.review.csv'}</code> for review;
+                    products are not published until you apply them.
+                  </p>
                 </div>
-                <h3 className="font-semibold text-foreground group-hover:text-brand-pink transition-colors">
-                  {type.name}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">{type.description}</p>
-              </button>
-            ))}
+              );
+            })()}
           </motion.div>
         )}
 

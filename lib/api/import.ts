@@ -176,4 +176,44 @@ export const importApi = {
   cancel: (id: string): Promise<ImportJob> => request<ImportJob>(`/import/jobs/${id}/cancel`, { method: 'POST' }),
 
   listTemplates: (): Promise<ImportTemplate[]> => request<ImportTemplate[]>('/import/templates', { method: 'GET' }),
+
+  // ── Import through API (PA-API) — readiness/start/history (no secrets) ──
+  getApiConfig: (): Promise<ApiImportConfig> => request<ApiImportConfig>('/admin/import/api/config', { method: 'GET' }),
+  startApiImport: (): Promise<ApiImportStartResult> => request<ApiImportStartResult>('/admin/import/api/start', { method: 'POST' }),
+  getApiHistory: (): Promise<ApiImportHistoryRow[]> => request<ApiImportHistoryRow[]>('/admin/import/api/history', { method: 'GET' }),
 };
+
+export interface ApiImportConfig {
+  provider: 'amazon-paapi';
+  partnerType: string;
+  ready: boolean;
+  required: string[];
+  missing: string[];
+  partnerTagConfigured: boolean;
+  marketplace: string;
+  region: string;
+  host: string | null;
+  keywordsFile: string;
+  reviewFile: string;
+}
+
+export interface ApiImportStartResult {
+  provider: 'amazon-paapi';
+  keywords: number;
+  rows: number;
+  selected: number;
+  reviewFile: string;
+  message: string;
+}
+
+export interface ApiImportHistoryRow {
+  id: string;
+  type: string;
+  status: string;
+  source: string;
+  totalItems: number;
+  successCount: number;
+  failedCount: number;
+  createdAt: string;
+  completedAt: string | null;
+}
