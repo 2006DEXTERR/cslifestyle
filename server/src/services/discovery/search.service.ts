@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 import { expandTerms } from './synonym.service';
 import { tokenize as relTokenize, likeFragments, relevanceScore, type SearchDoc } from '../../lib/search';
+import { cacheWrap } from '../../lib/cache';
 
 /**
  * Advanced search (Phase 11) over the unified `SearchIndexEntry`. Tokenises + synonym-
@@ -159,6 +160,11 @@ export interface SearchSuggestion {
 export async function searchSuggestions(q: string, limit = 8): Promise<SearchSuggestion[]> {
   const cap = Math.min(limit, 8);
   const term = q.trim();
+  // Short-TTL cache: autocomplete fires on every keystroke; suggestions change rarely.
+  return cacheWrap(`sugg:${cap}:${term.toLowerCase()}`, 30, () => computeSuggestions(term, cap));
+}
+
+async function computeSuggestions(term: string, cap: number): Promise<SearchSuggestion[]> {
   const trendingFallback = async (): Promise<SearchSuggestion[]> =>
     (await trendingTerms(cap)).map((t) => ({ label: t, type: 'popular' as const }));
 

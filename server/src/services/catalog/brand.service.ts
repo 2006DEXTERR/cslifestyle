@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentBrand, type PresentedBrand } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
+import { cacheWrap } from '../../lib/cache';
 import type { BrandListQuery, CreateBrandBody } from '../../validation/catalog.schemas';
 
 async function publishedCounts(): Promise<Map<string, number>> {
@@ -18,6 +19,17 @@ async function publishedCounts(): Promise<Map<string, number>> {
 }
 
 export async function listBrands(
+  query: BrandListQuery,
+  canSeeInactive: boolean,
+): Promise<PresentedBrand[]> {
+  // Cache only the public, non-search listing (changes rarely; short TTL self-heals).
+  if (!canSeeInactive && !query.q) {
+    return cacheWrap(`brand:list:${query.status ?? 'active'}`, 60, () => listBrandsUncached(query, canSeeInactive));
+  }
+  return listBrandsUncached(query, canSeeInactive);
+}
+
+async function listBrandsUncached(
   query: BrandListQuery,
   canSeeInactive: boolean,
 ): Promise<PresentedBrand[]> {

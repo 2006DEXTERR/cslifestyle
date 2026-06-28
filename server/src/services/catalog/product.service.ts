@@ -5,6 +5,7 @@ import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentProduct, type PresentedProduct } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
+import { cacheWrap } from '../../lib/cache';
 import type {
   ProductListQuery,
   CreateProductBody,
@@ -87,6 +88,18 @@ function buildOrderBy(sort?: ProductListQuery['sort']): Prisma.ProductOrderByWit
 }
 
 export async function listProducts(
+  query: ProductListQuery,
+  canSeeUnpublished: boolean,
+): Promise<{ items: PresentedProduct[]; pagination: Pagination }> {
+  // Cache public (published-only) listings — homepage/category/listing reads. Short TTL
+  // self-heals; admin (draft-visible) reads are never cached.
+  if (!canSeeUnpublished) {
+    return cacheWrap(`prod:list:${JSON.stringify(query)}`, 30, () => listProductsUncached(query, false));
+  }
+  return listProductsUncached(query, canSeeUnpublished);
+}
+
+async function listProductsUncached(
   query: ProductListQuery,
   canSeeUnpublished: boolean,
 ): Promise<{ items: PresentedProduct[]; pagination: Pagination }> {

@@ -23,10 +23,17 @@ import {
   CheckCircle,
   Bell,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { SearchAutocomplete } from '@/components/search/SearchAutocomplete';
-import { FeaturedProductsCarousel } from '@/components/home/FeaturedProductsCarousel';
 import { ProductCard } from '@/components/products/ProductCard';
+
+// Carousel (embla) is client-only and below the hero — load it lazily so its JS never
+// blocks the initial homepage paint. Data is fetched client-side anyway, so no visual change.
+const FeaturedProductsCarousel = dynamic(
+  () => import('@/components/home/FeaturedProductsCarousel').then((m) => m.FeaturedProductsCarousel),
+  { ssr: false },
+);
 import { CategoryCard } from '@/components/categories/CategoryCard';
 import { GuideCard } from '@/components/guides/GuideCard';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
