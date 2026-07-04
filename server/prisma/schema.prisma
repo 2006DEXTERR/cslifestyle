@@ -446,6 +446,64 @@ model GuideProduct {
   @@map("guide_products")
 }
 
+// ── Comparison typed-spec + winner-engine enums (Phase: rich comparison schema) ──
+// All additive; existing string columns are preserved for backward compatibility.
+
+/**
+ * How a spec value is rendered on the storefront (schema-driven UI).
+ */
+enum SpecDisplayType {
+  text
+  number
+  boolean
+  percentage
+  rating
+  currency
+  badge
+  progress
+  stars
+  icon
+
+  @@map("spec_display_type")
+}
+
+/**
+ * The underlying data type of a spec value (drives typed columns + winner engine).
+ */
+enum SpecValueType {
+  string
+  integer
+  float
+  boolean
+  json
+
+  @@map("spec_value_type")
+}
+
+/**
+ * How the per-spec winner is decided. `manual` uses the editorial `winner` column.
+ */
+enum SpecWinnerMode {
+  manual
+  higher_better
+  lower_better
+  equal
+  none
+
+  @@map("spec_winner_mode")
+}
+
+/**
+ * Editorial review workflow, independent of publish `status`.
+ */
+enum ComparisonReviewStatus {
+  draft
+  in_review
+  approved
+
+  @@map("comparison_review_status")
+}
+
 model Comparison {
   id              String        @id @default(cuid())
   slug            String        @unique
@@ -466,6 +524,21 @@ model Comparison {
   status          ContentStatus @default(draft)
   publishedAt     DateTime?     @map("published_at")
 
+  // ── Rich editorial content (Phase: rich comparison schema) — all optional ──
+  editorSummary      String?                @map("editor_summary") @db.Text
+  whoShouldBuyA      String?                @map("who_should_buy_a") @db.Text
+  whoShouldBuyB      String?                @map("who_should_buy_b") @db.Text
+  bestFor            String?                @map("best_for")
+  bestAlternativeIds Json?                  @map("best_alternative_ids") // string[] of product/comparison ids
+  faq                Json? // { question, answer }[]
+  comparisonNotes    String?                @map("comparison_notes") @db.Text
+  lastReviewedBy     String?                @map("last_reviewed_by")
+  reviewStatus       ComparisonReviewStatus @default(draft) @map("review_status")
+  featured           Boolean                @default(false)
+  stickyCta          Boolean                @default(true) @map("sticky_cta")
+  comparisonScoreA   Float?                 @map("comparison_score_a")
+  comparisonScoreB   Float?                 @map("comparison_score_b")
+
   specs    ComparisonSpec[]
   products ComparisonProduct[]
 
@@ -476,6 +549,7 @@ model Comparison {
   @@index([status, publishedAt])
   @@index([productAId])
   @@index([productBId])
+  @@index([featured])
   @@map("comparisons")
 }
 
@@ -486,9 +560,24 @@ model ComparisonSpec {
   specName      String     @map("spec_name")
   productAValue String?    @map("product_a_value")
   productBValue String?    @map("product_b_value")
-  winner        String? // 'A' | 'B' | 'tie'
+  winner        String? // 'A' | 'B' | 'tie' — legacy/editorial winner (used when winnerMode = manual)
   details       String?    @db.Text // UI preservation — per-row description
   position      Int        @default(0)
+
+  // ── Grouping + typed values + winner mode (Phase: rich comparison schema) ──
+  // All additive/nullable; legacy productAValue/productBValue remain the text source.
+  specGroup     String?         @map("spec_group") // e.g. General, Display, Camera, Battery…
+  subgroup      String?
+  displayType   SpecDisplayType @default(text) @map("display_type")
+  valueType     SpecValueType   @default(string) @map("value_type")
+  winnerMode    SpecWinnerMode  @default(manual) @map("winner_mode")
+  unit          String? // e.g. mAh, GB, %, nits — for numeric display
+  numberValueA  Float?          @map("number_value_a")
+  numberValueB  Float?          @map("number_value_b")
+  booleanValueA Boolean?        @map("boolean_value_a")
+  booleanValueB Boolean?        @map("boolean_value_b")
+  jsonValueA    Json?           @map("json_value_a")
+  jsonValueB    Json?           @map("json_value_b")
 
   @@index([comparisonId])
   @@map("comparison_specs")

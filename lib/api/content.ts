@@ -48,10 +48,56 @@ export interface ContentGuide extends BuyingGuide {
   updatedAt: string;
 }
 
-export interface ContentComparison extends Omit<Comparison, 'productA' | 'productB'> {
+export interface ComparisonInsights {
+  bestPrice: 'A' | 'B' | null;
+  higherRated: 'A' | 'B' | null;
+  moreReviewed: 'A' | 'B' | null;
+  specWins: { a: number; b: number; tie: number };
+  priceDiff: number | null;
+}
+
+/** A single comparison spec row with typed/grouped metadata (schema-driven UI). */
+export interface ComparisonSpecView {
+  name: string;
+  winner: 'A' | 'B' | 'tie';
+  details: string;
+  productA: string;
+  productB: string;
+  group: string;
+  subgroup: string | null;
+  displayType: string; // text | number | boolean | percentage | rating | currency | badge | progress | stars | icon
+  valueType: string;
+  winnerMode: string;
+  unit: string | null;
+  numberValueA: number | null;
+  numberValueB: number | null;
+  booleanValueA: boolean | null;
+  booleanValueB: boolean | null;
+  jsonValueA: unknown;
+  jsonValueB: unknown;
+}
+
+export interface ContentComparison extends Omit<Comparison, 'productA' | 'productB' | 'categories'> {
   // Presented products carry the catalog extras (incl. `asin`, used by /go links).
   productA: CatalogProduct;
   productB: CatalogProduct;
+  insights: ComparisonInsights;
+  categories: ComparisonSpecView[]; // flat (backward compatible)
+  specGroups: { group: string; specs: ComparisonSpecView[] }[]; // grouped view
+  // Rich editorial content (Phase: rich comparison schema) — empty/null until populated.
+  editorSummary: string | null;
+  whoShouldBuyA: string | null;
+  whoShouldBuyB: string | null;
+  bestFor: string | null;
+  bestAlternativeIds: string[];
+  faq: { question: string; answer: string }[];
+  comparisonNotes: string | null;
+  lastReviewedBy: string | null;
+  reviewStatus: string;
+  featured: boolean;
+  stickyCta: boolean;
+  comparisonScoreA: number | null;
+  comparisonScoreB: number | null;
   productAId: string;
   productBId: string;
   seoTitle: string | null;

@@ -75,12 +75,19 @@ describe.skipIf(!RUN)('content integration (DB)', () => {
     expect(res.body.data.productRecommendations.length).toBeGreaterThan(0);
   });
 
-  it('gets a comparison by slug with products + specs', async () => {
+  it('gets a comparison by slug with products + specs + derived insights', async () => {
     const res = await request(app).get('/api/comparisons/iphone-15-vs-samsung-s24');
     expect(res.status).toBe(200);
     expect(res.body.data.productA?.name).toBeTruthy();
     expect(res.body.data.productB?.name).toBeTruthy();
     expect(res.body.data.categories.length).toBeGreaterThan(0);
+    // Smart insights are computed from real fields (bestPrice/higherRated may be 'A'|'B'|null).
+    const ins = res.body.data.insights;
+    expect(ins).toBeTruthy();
+    expect(ins.specWins.a + ins.specWins.b + ins.specWins.tie).toBe(res.body.data.categories.length);
+    for (const k of ['bestPrice', 'higherRated', 'moreReviewed'] as const) {
+      expect([null, 'A', 'B']).toContain(ins[k]);
+    }
   });
 
   it('gets an author by slug with their published guides', async () => {

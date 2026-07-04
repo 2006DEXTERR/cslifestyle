@@ -131,6 +131,20 @@ function scalarData(body: Partial<CreateComparisonBody>): Prisma.ComparisonUnche
   if (body.prosCons !== undefined) d.prosCons = body.prosCons as Prisma.InputJsonValue;
   if (body.seoTitle !== undefined) d.seoTitle = body.seoTitle;
   if (body.metaDescription !== undefined) d.metaDescription = body.metaDescription;
+  // ── Rich editorial content (Phase: rich comparison schema) ──
+  if (body.editorSummary !== undefined) d.editorSummary = body.editorSummary;
+  if (body.whoShouldBuyA !== undefined) d.whoShouldBuyA = body.whoShouldBuyA;
+  if (body.whoShouldBuyB !== undefined) d.whoShouldBuyB = body.whoShouldBuyB;
+  if (body.bestFor !== undefined) d.bestFor = body.bestFor;
+  if (body.bestAlternativeIds !== undefined) d.bestAlternativeIds = body.bestAlternativeIds as Prisma.InputJsonValue;
+  if (body.faq !== undefined) d.faq = body.faq as Prisma.InputJsonValue;
+  if (body.comparisonNotes !== undefined) d.comparisonNotes = body.comparisonNotes;
+  if (body.lastReviewedBy !== undefined) d.lastReviewedBy = body.lastReviewedBy;
+  if (body.reviewStatus !== undefined) d.reviewStatus = body.reviewStatus;
+  if (body.featured !== undefined) d.featured = body.featured;
+  if (body.stickyCta !== undefined) d.stickyCta = body.stickyCta;
+  if (body.comparisonScoreA !== undefined) d.comparisonScoreA = body.comparisonScoreA;
+  if (body.comparisonScoreB !== undefined) d.comparisonScoreB = body.comparisonScoreB;
   return d;
 }
 
@@ -161,6 +175,19 @@ async function syncSpecs(
         winner: s.winner ?? null,
         details: s.details ?? null,
         position: i,
+        // ── typed / grouped fields (defaults applied by the DB when omitted) ──
+        specGroup: s.specGroup ?? null,
+        subgroup: s.subgroup ?? null,
+        ...(s.displayType ? { displayType: s.displayType } : {}),
+        ...(s.valueType ? { valueType: s.valueType } : {}),
+        ...(s.winnerMode ? { winnerMode: s.winnerMode } : {}),
+        unit: s.unit ?? null,
+        numberValueA: s.numberValueA ?? null,
+        numberValueB: s.numberValueB ?? null,
+        booleanValueA: s.booleanValueA ?? null,
+        booleanValueB: s.booleanValueB ?? null,
+        ...(s.jsonValueA !== undefined ? { jsonValueA: s.jsonValueA as Prisma.InputJsonValue } : {}),
+        ...(s.jsonValueB !== undefined ? { jsonValueB: s.jsonValueB as Prisma.InputJsonValue } : {}),
       })),
     });
   }

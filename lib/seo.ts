@@ -192,3 +192,16 @@ export function articleJsonLd({
     },
   };
 }
+
+/** FAQPage JSON-LD — only emit when there are real editorial FAQ entries. */
+export function faqJsonLd(items: { question: string; answer: string }[]): Json {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer },
+    })),
+  };
+}

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ComparisonDetail } from './comparison-detail';
 import { JsonLd } from '@/components/seo/JsonLd';
-import { buildMetadata, articleJsonLd, breadcrumbJsonLd } from '@/lib/seo';
+import { buildMetadata, articleJsonLd, breadcrumbJsonLd, faqJsonLd } from '@/lib/seo';
 import { getComparison, listComparisonSlugs, listComparisons, recommendRelatedComparisons } from '@/lib/api/ssr';
 
 export const revalidate = 3600; // ISR
@@ -52,6 +52,8 @@ export default async function ComparisonPage({ params }: { params: { slug: strin
             { name: 'Comparisons', path: '/comparisons' },
             { name: comparison.title, path: `/comparisons/${comparison.slug}` },
           ]),
+          // FAQ schema only when the comparison has real editorial FAQ entries.
+          ...(comparison.faq?.length ? [faqJsonLd(comparison.faq)] : []),
         ]}
       />
       <ComparisonDetail comparison={comparison} relatedComparisons={related} />

@@ -88,6 +88,19 @@ const specsSchema = z.array(
     productBValue: z.string().trim().max(2000).optional(),
     winner: z.enum(WINNER).optional(),
     details: z.string().trim().max(5000).optional(),
+    // ── Rich spec fields (Phase: rich comparison schema) — all optional/backward compatible ──
+    specGroup: z.string().trim().max(80).optional(),
+    subgroup: z.string().trim().max(80).optional(),
+    displayType: z.enum(['text', 'number', 'boolean', 'percentage', 'rating', 'currency', 'badge', 'progress', 'stars', 'icon']).optional(),
+    valueType: z.enum(['string', 'integer', 'float', 'boolean', 'json']).optional(),
+    winnerMode: z.enum(['manual', 'higher_better', 'lower_better', 'equal', 'none']).optional(),
+    unit: z.string().trim().max(20).optional(),
+    numberValueA: z.number().nullable().optional(),
+    numberValueB: z.number().nullable().optional(),
+    booleanValueA: z.boolean().nullable().optional(),
+    booleanValueB: z.boolean().nullable().optional(),
+    jsonValueA: z.unknown().optional(),
+    jsonValueB: z.unknown().optional(),
   }),
 );
 const prosConsSchema = z
@@ -107,10 +120,27 @@ const comparisonBase = {
   verdict: optionalText,
   winner: z.enum(WINNER).optional(),
   prosCons: prosConsSchema.optional(),
-  specs: specsSchema.max(50).optional(),
+  specs: specsSchema.max(200).optional(),
   seoTitle: z.string().trim().max(300).optional(),
   metaDescription: z.string().trim().max(500).optional(),
   status: z.enum(STATUS).optional(),
+  // ── Rich editorial content (Phase: rich comparison schema) — all optional ──
+  editorSummary: optionalText,
+  whoShouldBuyA: optionalText,
+  whoShouldBuyB: optionalText,
+  bestFor: z.string().trim().max(300).optional(),
+  bestAlternativeIds: stringArray.max(12).optional(),
+  faq: z
+    .array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(3000) }))
+    .max(30)
+    .optional(),
+  comparisonNotes: optionalText,
+  lastReviewedBy: z.string().trim().max(120).optional(),
+  reviewStatus: z.enum(['draft', 'in_review', 'approved']).optional(),
+  featured: z.boolean().optional(),
+  stickyCta: z.boolean().optional(),
+  comparisonScoreA: z.number().min(0).max(100).nullable().optional(),
+  comparisonScoreB: z.number().min(0).max(100).nullable().optional(),
 };
 
 export const createComparisonSchema = z.object(comparisonBase).refine((b) => b.productAId !== b.productBId, {
