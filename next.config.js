@@ -57,6 +57,25 @@ const nextConfig = {
       { source: '/api/settings/:path*', destination: `${backendOrigin}/api/settings/:path*` },
       { source: '/api/settings', destination: `${backendOrigin}/api/settings` },
       { source: '/api/seo/:path*', destination: `${backendOrigin}/api/seo/:path*` },
+      // Admin dashboard overview + API Import Center live under /api/admin/* — must be
+      // proxied to the backend (previously missing → admin dashboard/import 404'd in
+      // split frontend/backend deployments).
+      { source: '/api/admin/:path*', destination: `${backendOrigin}/api/admin/:path*` },
+    ];
+  },
+  // Security headers for the storefront/admin HTML (the backend API sets its own via
+  // Helmet). No CSP here to avoid breaking Next's inline runtime; these are safe defaults.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' },
+        ],
+      },
     ];
   },
 };

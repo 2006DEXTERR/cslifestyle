@@ -247,6 +247,7 @@ model Brand {
 
   @@index([slug])
   @@index([isActive])
+  @@index([isActive, name]) // brand list: active brands ordered by name
   @@map("brands")
 }
 
@@ -322,6 +323,12 @@ model Product {
   @@index([asin])
   @@index([isPublished, categoryId])
   @@index([isPublished, isTrending])
+  // Hot storefront/listing patterns (Phase: perf indexing):
+  @@index([isPublished, createdAt]) // default "newest published" sort (homepage + listing)
+  @@index([isPublished, isEditorsPick]) // editor's-pick section/filter
+  @@index([isPublished, brandId]) // brand detail pages (published products by brand)
+  @@index([isPublished, rating]) // sort=rating
+  @@index([isPublished, currentPrice]) // sort=price-low/high
   @@map("products")
 }
 
@@ -428,6 +435,7 @@ model Guide {
   @@index([categoryId])
   @@index([authorId])
   @@index([status, publishedAt])
+  @@index([status, categoryId]) // guide index filtered by category + published status
   @@map("guides")
 }
 
@@ -550,6 +558,7 @@ model Comparison {
   @@index([productAId])
   @@index([productBId])
   @@index([featured])
+  @@index([status, featured]) // featured published comparisons
   @@map("comparisons")
 }
 

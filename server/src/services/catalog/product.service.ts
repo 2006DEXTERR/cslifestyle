@@ -5,7 +5,7 @@ import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentProduct, type PresentedProduct } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
-import { cacheWrap } from '../../lib/cache';
+import { cacheWrap, bust, CACHE_NS, TTL } from '../../lib/cache';
 import type {
   ProductListQuery,
   CreateProductBody,
@@ -94,7 +94,7 @@ export async function listProducts(
   // Cache public (published-only) listings — homepage/category/listing reads. Short TTL
   // self-heals; admin (draft-visible) reads are never cached.
   if (!canSeeUnpublished) {
-    return cacheWrap(`prod:list:${JSON.stringify(query)}`, 30, () => listProductsUncached(query, false));
+    return cacheWrap(`${CACHE_NS.productList}${JSON.stringify(query)}`, TTL.productList, () => listProductsUncached(query, false));
   }
   return listProductsUncached(query, canSeeUnpublished);
 }
@@ -171,6 +171,14 @@ export async function getProductBySlug(
   slug: string,
   canSeeUnpublished: boolean,
 ): Promise<PresentedProduct> {
+  // Cache only the public (published-only) read; admin/draft reads are never cached.
+  if (!canSeeUnpublished) {
+    return cacheWrap(`${CACHE_NS.productSlug}${slug}`, TTL.detail, () => getProductBySlugUncached(slug, false));
+  }
+  return getProductBySlugUncached(slug, canSeeUnpublished);
+}
+
+async function getProductBySlugUncached(slug: string, canSeeUnpublished: boolean): Promise<PresentedProduct> {
   const row = await prisma.product.findUnique({ where: { slug }, include: PRODUCT_INCLUDE });
   if (!row || (!canSeeUnpublished && !row.isPublished)) {
     throw ApiError.notFound('Product not found');
@@ -267,6 +275,7 @@ export async function createProduct(body: CreateProductBody): Promise<PresentedP
     return product;
   });
 
+  await bust.products();
   return getProductById(created.id, true);
 }
 
@@ -301,6 +310,7 @@ export async function updateProduct(id: string, body: UpdateProductBody): Promis
     }
   });
 
+  await bust.products();
   return getProductById(id, true);
 }
 
@@ -308,6 +318,7 @@ export async function deleteProduct(id: string): Promise<void> {
   const existing = await prisma.product.findUnique({ where: { id }, select: { id: true } });
   if (!existing) throw ApiError.notFound('Product not found');
   await prisma.product.delete({ where: { id } }); // cascades images + price history
+  await bust.products();
 }
 
 export async function bulkProducts(
@@ -316,12 +327,14 @@ export async function bulkProducts(
 ): Promise<{ affected: number }> {
   if (action === 'delete') {
     const res = await prisma.product.deleteMany({ where: { id: { in: ids } } });
+    await bust.products();
     return { affected: res.count };
   }
   const res = await prisma.product.updateMany({
     where: { id: { in: ids } },
     data: { isPublished: action === 'publish' },
   });
+  await bust.products();
   return { affected: res.count };
 }
 

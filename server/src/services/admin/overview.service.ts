@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import { cacheWrap } from '../../lib/cache';
+import { cacheWrap, CACHE_NS, TTL } from '../../lib/cache';
 
 /**
  * Admin dashboard overview (Phase 13.x) — live counts + recent activity + small
@@ -31,7 +31,7 @@ const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export async function getAdminOverview(): Promise<AdminOverview> {
   // Same data for every admin; short TTL keeps the heavy aggregation off the hot path.
-  return cacheWrap('admin:overview', 30, computeAdminOverview);
+  return cacheWrap(CACHE_NS.overview, TTL.overview, computeAdminOverview);
 }
 
 async function computeAdminOverview(): Promise<AdminOverview> {

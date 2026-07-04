@@ -4,7 +4,7 @@ import { ApiError } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentBrand, type PresentedBrand } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
-import { cacheWrap } from '../../lib/cache';
+import { cacheWrap, bust, CACHE_NS, TTL } from '../../lib/cache';
 import type { BrandListQuery, CreateBrandBody } from '../../validation/catalog.schemas';
 
 async function publishedCounts(): Promise<Map<string, number>> {
@@ -24,7 +24,7 @@ export async function listBrands(
 ): Promise<PresentedBrand[]> {
   // Cache only the public, non-search listing (changes rarely; short TTL self-heals).
   if (!canSeeInactive && !query.q) {
-    return cacheWrap(`brand:list:${query.status ?? 'active'}`, 60, () => listBrandsUncached(query, canSeeInactive));
+    return cacheWrap(`${CACHE_NS.brandList}${query.status ?? 'active'}`, TTL.catalogList, () => listBrandsUncached(query, canSeeInactive));
   }
   return listBrandsUncached(query, canSeeInactive);
 }
@@ -65,6 +65,13 @@ export async function getBrandBySlug(
   slug: string,
   canSeeInactive: boolean,
 ): Promise<PresentedBrand> {
+  if (!canSeeInactive) {
+    return cacheWrap(`${CACHE_NS.brandSlug}${slug}`, TTL.detail, () => getBrandBySlugUncached(slug, false));
+  }
+  return getBrandBySlugUncached(slug, canSeeInactive);
+}
+
+async function getBrandBySlugUncached(slug: string, canSeeInactive: boolean): Promise<PresentedBrand> {
   const row = await prisma.brand.findUnique({ where: { slug } });
   if (!row || (!canSeeInactive && !row.isActive)) throw ApiError.notFound('Brand not found');
   const count = await prisma.product.count({ where: { brandId: row.id, isPublished: true } });
@@ -93,6 +100,7 @@ export async function createBrand(body: CreateBrandBody): Promise<PresentedBrand
   const row = await prisma.brand.create({
     data: { ...(scalarData(body) as Prisma.BrandUncheckedCreateInput), slug },
   });
+  await bust.brands();
   return presentBrand(row, 0);
 }
 
@@ -108,6 +116,7 @@ export async function updateBrand(
 
   const row = await prisma.brand.update({ where: { id }, data });
   const count = await prisma.product.count({ where: { brandId: id, isPublished: true } });
+  await bust.brands();
   return presentBrand(row, count);
 }
 
@@ -116,4 +125,5 @@ export async function deleteBrand(id: string): Promise<void> {
   if (!existing) throw ApiError.notFound('Brand not found');
   // Products keep existing — their brandId is set NULL by the FK (onDelete: SetNull).
   await prisma.brand.delete({ where: { id } });
+  await bust.brands();
 }

@@ -5,6 +5,7 @@ import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentGuide, type PresentedGuide } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
+import { cacheWrap, bust, CACHE_NS, TTL } from '../../lib/cache';
 import type { GuideListQuery, CreateGuideBody } from '../../validation/content.schemas';
 
 const SEARCH_CANDIDATE_CAP = 400;
@@ -50,6 +51,17 @@ function buildOrderBy(sort: GuideListQuery['sort']): Prisma.GuideOrderByWithRela
 }
 
 export async function listGuides(
+  query: GuideListQuery,
+  canSeeUnpublished: boolean,
+): Promise<{ items: PresentedGuide[]; pagination: Pagination }> {
+  // Cache the public, non-search listing (homepage/guide index); admin/search paths run fresh.
+  if (!canSeeUnpublished && !query.q) {
+    return cacheWrap(`${CACHE_NS.guideList}${JSON.stringify(query)}`, TTL.contentList, () => listGuidesUncached(query, false));
+  }
+  return listGuidesUncached(query, canSeeUnpublished);
+}
+
+async function listGuidesUncached(
   query: GuideListQuery,
   canSeeUnpublished: boolean,
 ): Promise<{ items: PresentedGuide[]; pagination: Pagination }> {
@@ -114,6 +126,13 @@ export async function getGuideBySlug(
   slug: string,
   canSeeUnpublished: boolean,
 ): Promise<PresentedGuide> {
+  if (!canSeeUnpublished) {
+    return cacheWrap(`${CACHE_NS.guideSlug}${slug}`, TTL.detail, () => getGuideBySlugUncached(slug, false));
+  }
+  return getGuideBySlugUncached(slug, canSeeUnpublished);
+}
+
+async function getGuideBySlugUncached(slug: string, canSeeUnpublished: boolean): Promise<PresentedGuide> {
   const row = await prisma.guide.findUnique({ where: { slug }, include: FULL_INCLUDE });
   if (!row || (!canSeeUnpublished && row.status !== 'published')) throw ApiError.notFound('Guide not found');
   const presented = presentGuide(row);
@@ -199,6 +218,7 @@ export async function createGuide(body: CreateGuideBody): Promise<PresentedGuide
     return guide;
   });
 
+  await bust.guides();
   return getGuideById(created.id);
 }
 
@@ -222,6 +242,7 @@ export async function updateGuide(
     await syncProducts(tx, id, body.products);
   });
 
+  await bust.guides();
   return getGuideById(id);
 }
 
@@ -229,6 +250,7 @@ export async function deleteGuide(id: string): Promise<void> {
   const existing = await prisma.guide.findUnique({ where: { id }, select: { id: true } });
   if (!existing) throw ApiError.notFound('Guide not found');
   await prisma.guide.delete({ where: { id } });
+  await bust.guides();
 }
 
 export async function setGuideStatus(

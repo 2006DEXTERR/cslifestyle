@@ -185,6 +185,19 @@ export const isProd = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';
 export const isDev = env.NODE_ENV === 'development';
 
+// Non-fatal production hygiene warnings (console, since the logger depends on env).
+if (isProd) {
+  if (!env.COOKIE_SECURE) {
+    console.warn('⚠️  COOKIE_SECURE=false in production — auth cookies would be sent over plain HTTP. Set COOKIE_SECURE=true behind HTTPS.');
+  }
+  if (env.COOKIE_SAMESITE === 'none' && !env.COOKIE_SECURE) {
+    console.warn('⚠️  COOKIE_SAMESITE=none requires COOKIE_SECURE=true, or browsers reject the cookie.');
+  }
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY is not set — transactional/newsletter emails will not be delivered in production.');
+  }
+}
+
 /** Origins allowed by CORS, parsed from the comma-separated CORS_ORIGIN. */
 export const corsOrigins = env.CORS_ORIGIN.split(',')
   .map((o) => o.trim())

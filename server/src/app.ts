@@ -39,9 +39,14 @@ export function createApp(): Express {
   app.use(requestId);
   app.use(pinoHttp({ logger, genReqId: (req) => (req as { id?: string }).id ?? '' }));
   app.use(helmet());
+  // Helmet does not set Permissions-Policy — deny powerful browser features by default.
+  app.use((_req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), browsing-topics=()');
+    next();
+  });
   app.use(cors({ origin: corsOrigins, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
 
   // Health probes at root (for infra/orchestrator checks).

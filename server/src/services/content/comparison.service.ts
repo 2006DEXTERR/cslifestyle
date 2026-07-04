@@ -5,6 +5,7 @@ import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentComparison, type PresentedComparison } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
+import { cacheWrap, bust, CACHE_NS, TTL } from '../../lib/cache';
 import type { ComparisonListQuery, CreateComparisonBody } from '../../validation/content.schemas';
 
 const SEARCH_CANDIDATE_CAP = 400;
@@ -51,6 +52,16 @@ function buildOrderBy(sort: ComparisonListQuery['sort']): Prisma.ComparisonOrder
 }
 
 export async function listComparisons(
+  query: ComparisonListQuery,
+  canSeeUnpublished: boolean,
+): Promise<{ items: PresentedComparison[]; pagination: Pagination }> {
+  if (!canSeeUnpublished && !query.q) {
+    return cacheWrap(`${CACHE_NS.comparisonList}${JSON.stringify(query)}`, TTL.contentList, () => listComparisonsUncached(query, false));
+  }
+  return listComparisonsUncached(query, canSeeUnpublished);
+}
+
+async function listComparisonsUncached(
   query: ComparisonListQuery,
   canSeeUnpublished: boolean,
 ): Promise<{ items: PresentedComparison[]; pagination: Pagination }> {
@@ -110,6 +121,13 @@ export async function getComparisonBySlug(
   slug: string,
   canSeeUnpublished: boolean,
 ): Promise<PresentedComparison> {
+  if (!canSeeUnpublished) {
+    return cacheWrap(`${CACHE_NS.comparisonSlug}${slug}`, TTL.detail, () => getComparisonBySlugUncached(slug, false));
+  }
+  return getComparisonBySlugUncached(slug, canSeeUnpublished);
+}
+
+async function getComparisonBySlugUncached(slug: string, canSeeUnpublished: boolean): Promise<PresentedComparison> {
   const row = await prisma.comparison.findUnique({ where: { slug }, include: FULL_INCLUDE });
   if (!row || (!canSeeUnpublished && row.status !== 'published')) throw ApiError.notFound('Comparison not found');
   return presentComparison(row);
@@ -228,6 +246,7 @@ export async function createComparison(body: CreateComparisonBody): Promise<Pres
     return comparison;
   });
 
+  await bust.comparisons();
   return getComparisonById(created.id);
 }
 
@@ -257,6 +276,7 @@ export async function updateComparison(
     }
   });
 
+  await bust.comparisons();
   return getComparisonById(id);
 }
 
@@ -264,6 +284,7 @@ export async function deleteComparison(id: string): Promise<void> {
   const existing = await prisma.comparison.findUnique({ where: { id }, select: { id: true } });
   if (!existing) throw ApiError.notFound('Comparison not found');
   await prisma.comparison.delete({ where: { id } });
+  await bust.comparisons();
 }
 
 export async function setComparisonStatus(

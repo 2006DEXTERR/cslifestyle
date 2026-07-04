@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { ApiError } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
 import { presentCategory, type PresentedCategory } from './presenters';
-import { cacheWrap } from '../../lib/cache';
+import { cacheWrap, bust, CACHE_NS, TTL } from '../../lib/cache';
 import type { CategoryListQuery, CreateCategoryBody } from '../../validation/catalog.schemas';
 
 /** Map of categoryId → published-product count (for the UI productCount badge). */
@@ -37,7 +37,7 @@ export async function listCategories(
 
   // Cache only the public, non-search listing (changes rarely; short TTL self-heals).
   if (!canSeeInactive && !query.q) {
-    return cacheWrap(`cat:list:${query.status ?? 'active'}:${query.parent ?? 'all'}`, 60, run);
+    return cacheWrap(`${CACHE_NS.categoryList}${query.status ?? 'active'}:${query.parent ?? 'all'}`, TTL.catalogList, run);
   }
   return run();
 }
@@ -46,6 +46,13 @@ export async function getCategoryBySlug(
   slug: string,
   canSeeInactive: boolean,
 ): Promise<PresentedCategory> {
+  if (!canSeeInactive) {
+    return cacheWrap(`${CACHE_NS.categorySlug}${slug}`, TTL.detail, () => getCategoryBySlugUncached(slug, false));
+  }
+  return getCategoryBySlugUncached(slug, canSeeInactive);
+}
+
+async function getCategoryBySlugUncached(slug: string, canSeeInactive: boolean): Promise<PresentedCategory> {
   const row = await prisma.category.findUnique({ where: { slug } });
   if (!row || (!canSeeInactive && !row.isActive)) throw ApiError.notFound('Category not found');
   const count = await prisma.product.count({ where: { categoryId: row.id, isPublished: true } });
@@ -84,6 +91,7 @@ export async function createCategory(body: CreateCategoryBody): Promise<Presente
   const row = await prisma.category.create({
     data: { ...(scalarData(body) as Prisma.CategoryUncheckedCreateInput), slug },
   });
+  await bust.categories();
   return presentCategory(row, 0);
 }
 
@@ -100,6 +108,7 @@ export async function updateCategory(
 
   const row = await prisma.category.update({ where: { id }, data });
   const count = await prisma.product.count({ where: { categoryId: id, isPublished: true } });
+  await bust.categories();
   return presentCategory(row, count);
 }
 
@@ -116,4 +125,5 @@ export async function deleteCategory(id: string): Promise<void> {
     throw new ApiError(409, 'Cannot delete a category that has sub-categories');
   }
   await prisma.category.delete({ where: { id } });
+  await bust.categories();
 }
