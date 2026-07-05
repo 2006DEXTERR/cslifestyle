@@ -2,12 +2,17 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { contentApi, type ContentComparison } from '@/lib/api/content';
 
+const shortName = (name: string) => name?.split(' ')[0] ?? '';
+
 export default function ComparisonsPage() {
   const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [query, setQuery] = React.useState('');
+  const [category, setCategory] = React.useState('');
 
   React.useEffect(() => {
     let active = true;
@@ -18,11 +23,37 @@ export default function ComparisonsPage() {
       })
       .catch(() => {
         if (active) setComparisons([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
   }, []);
+
+  // Category options derived from the loaded comparisons (no invented data).
+  const categories = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const c of comparisons) {
+      const cat = c.productA?.category || c.productB?.category;
+      if (cat) set.add(cat);
+    }
+    return Array.from(set).sort();
+  }, [comparisons]);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return comparisons.filter((c) => {
+      const cat = c.productA?.category || c.productB?.category || '';
+      if (category && cat !== category) return false;
+      if (!q) return true;
+      const hay = [c.title, c.excerpt, shortName(c.productA?.name), shortName(c.productB?.name)]
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [comparisons, query, category]);
 
   return (
     <div className="min-h-screen">
@@ -41,18 +72,67 @@ export default function ComparisonsPage() {
       </section>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {comparisons.map((comparison, index) => (
-            <motion.div
-              key={comparison.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
+        {/* Search + category filter */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search comparisons…"
+              aria-label="Search comparisons"
+              className="w-full pl-9 pr-3 h-10 rounded-lg border bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          {categories.length > 0 && (
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              aria-label="Filter by category"
+              className="h-10 rounded-lg border bg-background px-3 text-sm"
             >
-              <ComparisonCard comparison={comparison} />
-            </motion.div>
-          ))}
+              <option value="">All categories</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          )}
+          {!loading && (
+            <span className="text-sm text-muted-foreground sm:ml-auto">
+              {filtered.length} comparison{filtered.length === 1 ? '' : 's'}
+            </span>
+          )}
         </div>
+
+        {loading ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-64 rounded-xl border bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-card p-12 text-center">
+            <p className="text-muted-foreground">
+              {comparisons.length === 0
+                ? 'No comparisons published yet. Check back soon.'
+                : 'No comparisons match your search.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filtered.map((comparison, index) => (
+              <motion.div
+                key={comparison.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(index, 8) * 0.05 }}
+              >
+                <ComparisonCard comparison={comparison} />
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

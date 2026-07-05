@@ -5,6 +5,8 @@ import { Trophy, ChevronRight, Check, X, ExternalLink, Star, ThumbsUp, ThumbsDow
 import { Button } from '@/components/ui/button';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { ComparisonTable } from '@/components/comparisons/ComparisonTable';
+import { ProductCard } from '@/components/products/ProductCard';
+import { productImageClass } from '@/lib/image';
 import type { ContentComparison } from '@/lib/api/content';
 import { formatNumber, formatDate } from '@/lib/format';
 import { AnalyticsBeacon } from '@/components/analytics/AnalyticsBeacon';
@@ -29,6 +31,19 @@ export function ComparisonDetail({
   const { insights } = comparison;
   const category = comparison.productA.category || comparison.productB.category;
   const [shared, setShared] = React.useState(false);
+
+  // Sticky CTA bar — opt-in per comparison (`stickyCta`). Appears after the hero scrolls
+  // out of view and can be dismissed. Reuses the existing brand-gradient button styling.
+  const [ctaVisible, setCtaVisible] = React.useState(false);
+  const [ctaDismissed, setCtaDismissed] = React.useState(false);
+  React.useEffect(() => {
+    if (!comparison.stickyCta) return;
+    const onScroll = () => setCtaVisible(window.scrollY > 640);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [comparison.stickyCta]);
+  const showStickyCta = comparison.stickyCta && ctaVisible && !ctaDismissed;
   const onShare = async () => {
     const url = typeof window !== 'undefined' ? window.location.href : '';
     try {
@@ -43,7 +58,7 @@ export function ComparisonDetail({
   const sideName = (s: 'A' | 'B') => shortName(s === 'A' ? comparison.productA.name : comparison.productB.name);
 
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${showStickyCta ? 'pb-24 md:pb-20' : ''}`}>
       <AnalyticsBeacon type="comparison_view" entityType="comparison" entityId={comparison.id} />
       {/* Breadcrumb */}
       <div className="bg-muted/30 border-b">
@@ -109,19 +124,25 @@ export function ComparisonDetail({
                 <img
                   src={comparison.productA.image}
                   alt={comparison.productA.name}
-                  className="w-full h-full object-cover"
+                  className={productImageClass}
                 />
               </div>
               <div className="p-6">
                 <p className="text-sm text-muted-foreground mb-1">{comparison.productA.brand}</p>
                 <h2 className="text-xl font-bold mb-3">{comparison.productA.name}</h2>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   <span className="font-semibold">{comparison.productA.rating}</span>
                   <span className="text-sm text-muted-foreground">
                     ({formatNumber(comparison.productA.reviewCount)} reviews)
                   </span>
                 </div>
+                {typeof comparison.comparisonScoreA === 'number' && (
+                  <p className="text-sm mb-4">
+                    <span className="font-semibold text-green-600">{comparison.comparisonScoreA}</span>
+                    <span className="text-muted-foreground">/100 CSLifestyle score</span>
+                  </p>
+                )}
                 <p className="text-2xl font-bold mb-4">
                   {formatPrice(comparison.productA.currentPrice)}
                 </p>
@@ -168,19 +189,25 @@ export function ComparisonDetail({
                 <img
                   src={comparison.productB.image}
                   alt={comparison.productB.name}
-                  className="w-full h-full object-cover"
+                  className={productImageClass}
                 />
               </div>
               <div className="p-6">
                 <p className="text-sm text-muted-foreground mb-1">{comparison.productB.brand}</p>
                 <h2 className="text-xl font-bold mb-3">{comparison.productB.name}</h2>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   <span className="font-semibold">{comparison.productB.rating}</span>
                   <span className="text-sm text-muted-foreground">
                     ({formatNumber(comparison.productB.reviewCount)} reviews)
                   </span>
                 </div>
+                {typeof comparison.comparisonScoreB === 'number' && (
+                  <p className="text-sm mb-4">
+                    <span className="font-semibold text-green-600">{comparison.comparisonScoreB}</span>
+                    <span className="text-muted-foreground">/100 CSLifestyle score</span>
+                  </p>
+                )}
                 <p className="text-2xl font-bold mb-4">
                   {formatPrice(comparison.productB.currentPrice)}
                 </p>
@@ -204,7 +231,7 @@ export function ComparisonDetail({
       </section>
 
       {/* Smart insights — derived only from real DB fields */}
-      {(winnerLabel || insights.bestPrice || insights.higherRated || insights.specWins.a + insights.specWins.b > 0) && (
+      {(winnerLabel || comparison.bestFor || insights.bestPrice || insights.higherRated || insights.specWins.a + insights.specWins.b > 0) && (
         <section className="py-6 border-t">
           <div className="container mx-auto px-4">
             <div className="flex flex-wrap gap-3">
@@ -212,6 +239,12 @@ export function ComparisonDetail({
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-gradient text-white text-sm font-medium">
                   <Trophy className="w-4 h-4" aria-hidden="true" />
                   Best Overall: {winnerLabel}
+                </span>
+              )}
+              {comparison.bestFor && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-sm font-medium">
+                  <Award className="w-4 h-4" aria-hidden="true" />
+                  Best for: {comparison.bestFor}
                 </span>
               )}
               {insights.bestPrice && (
@@ -395,6 +428,21 @@ export function ComparisonDetail({
         </section>
       )}
 
+      {/* Recommended Alternatives — resolved, published products only (never fabricated) */}
+      {comparison.bestAlternatives.length > 0 && (
+        <section className="py-8 border-t">
+          <div className="container mx-auto px-4">
+            <h2 className="text-2xl font-bold mb-2">Recommended Alternatives</h2>
+            <p className="text-muted-foreground mb-6">Other options worth considering before you decide.</p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {comparison.bestAlternatives.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Related Comparisons */}
       {relatedComparisons.length > 0 && (
         <section className="py-12 bg-muted/30">
@@ -407,6 +455,49 @@ export function ComparisonDetail({
             </div>
           </div>
         </section>
+      )}
+
+      {/* Sticky CTA bar — opt-in, dismissible; both affiliate CTAs always reachable */}
+      {showStickyCta && (
+        <div className="fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
+          <div className="container mx-auto px-4 py-3 flex items-center gap-3">
+            <p className="hidden sm:block flex-1 text-sm font-medium truncate">
+              {shortName(comparison.productA.name)} vs {shortName(comparison.productB.name)}
+            </p>
+            <div className="flex flex-1 sm:flex-initial items-center gap-2">
+              <a
+                href={`/go/${comparison.productA.asin}?src=comparison_sticky`}
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
+                className="flex-1 sm:flex-initial"
+              >
+                <Button size="sm" className="w-full bg-brand-gradient hover:opacity-90">
+                  {shortName(comparison.productA.name)}
+                  <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
+                </Button>
+              </a>
+              <a
+                href={`/go/${comparison.productB.asin}?src=comparison_sticky`}
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
+                className="flex-1 sm:flex-initial"
+              >
+                <Button size="sm" className="w-full bg-brand-gradient hover:opacity-90">
+                  {shortName(comparison.productB.name)}
+                  <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
+                </Button>
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCtaDismissed(true)}
+              aria-label="Dismiss"
+              className="p-1.5 rounded-full text-muted-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

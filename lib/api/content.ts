@@ -90,6 +90,8 @@ export interface ContentComparison extends Omit<Comparison, 'productA' | 'produc
   whoShouldBuyB: string | null;
   bestFor: string | null;
   bestAlternativeIds: string[];
+  /** Resolved, published alternative products (safe to render as links). */
+  bestAlternatives: CatalogProduct[];
   faq: { question: string; answer: string }[];
   comparisonNotes: string | null;
   lastReviewedBy: string | null;

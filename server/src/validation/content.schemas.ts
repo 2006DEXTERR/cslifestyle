@@ -81,28 +81,46 @@ export const updateGuideSchema = createGuideSchema
 
 // ───────────────────────── Comparisons ─────────────────────────
 
-const specsSchema = z.array(
-  z.object({
-    specName: z.string().trim().min(1).max(300),
-    productAValue: z.string().trim().max(2000).optional(),
-    productBValue: z.string().trim().max(2000).optional(),
-    winner: z.enum(WINNER).optional(),
-    details: z.string().trim().max(5000).optional(),
-    // ── Rich spec fields (Phase: rich comparison schema) — all optional/backward compatible ──
-    specGroup: z.string().trim().max(80).optional(),
-    subgroup: z.string().trim().max(80).optional(),
-    displayType: z.enum(['text', 'number', 'boolean', 'percentage', 'rating', 'currency', 'badge', 'progress', 'stars', 'icon']).optional(),
-    valueType: z.enum(['string', 'integer', 'float', 'boolean', 'json']).optional(),
-    winnerMode: z.enum(['manual', 'higher_better', 'lower_better', 'equal', 'none']).optional(),
-    unit: z.string().trim().max(20).optional(),
-    numberValueA: z.number().nullable().optional(),
-    numberValueB: z.number().nullable().optional(),
-    booleanValueA: z.boolean().nullable().optional(),
-    booleanValueB: z.boolean().nullable().optional(),
-    jsonValueA: z.unknown().optional(),
-    jsonValueB: z.unknown().optional(),
-  }),
-);
+const specItemSchema = z.object({
+  specName: z.string().trim().min(1).max(300),
+  productAValue: z.string().trim().max(2000).optional(),
+  productBValue: z.string().trim().max(2000).optional(),
+  winner: z.enum(WINNER).optional(),
+  details: z.string().trim().max(5000).optional(),
+  // ── Rich spec fields (Phase: rich comparison schema) — all optional/backward compatible ──
+  specGroup: z.string().trim().max(80).optional(),
+  subgroup: z.string().trim().max(80).optional(),
+  displayType: z.enum(['text', 'number', 'boolean', 'percentage', 'rating', 'currency', 'badge', 'progress', 'stars', 'icon']).optional(),
+  valueType: z.enum(['string', 'integer', 'float', 'boolean', 'json']).optional(),
+  winnerMode: z.enum(['manual', 'higher_better', 'lower_better', 'equal', 'none']).optional(),
+  unit: z.string().trim().max(20).optional(),
+  numberValueA: z.number().nullable().optional(),
+  numberValueB: z.number().nullable().optional(),
+  booleanValueA: z.boolean().nullable().optional(),
+  booleanValueB: z.boolean().nullable().optional(),
+  jsonValueA: z.unknown().optional(),
+  jsonValueB: z.unknown().optional(),
+});
+// Reject duplicate specs (same name within the same group) so the comparison table
+// never renders two conflicting rows for one spec. Group defaults to "General".
+const specsSchema = z
+  .array(specItemSchema)
+  .max(200)
+  .superRefine((specs, ctx) => {
+    const seen = new Map<string, number>();
+    specs.forEach((s, i) => {
+      const key = `${(s.specGroup ?? 'General').toLowerCase()}|${s.specName.toLowerCase()}`;
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate spec "${s.specName}"${s.specGroup ? ` in group "${s.specGroup}"` : ''}`,
+          path: [i, 'specName'],
+        });
+      } else {
+        seen.set(key, i);
+      }
+    });
+  });
 const prosConsSchema = z
   .object({
     productA: z.object({ pros: stringArray.max(30), cons: stringArray.max(30) }).partial(),
@@ -120,7 +138,7 @@ const comparisonBase = {
   verdict: optionalText,
   winner: z.enum(WINNER).optional(),
   prosCons: prosConsSchema.optional(),
-  specs: specsSchema.max(200).optional(),
+  specs: specsSchema.optional(),
   seoTitle: z.string().trim().max(300).optional(),
   metaDescription: z.string().trim().max(500).optional(),
   status: z.enum(STATUS).optional(),

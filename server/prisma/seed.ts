@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import { COMPARISON_RICH } from './comparison-rich';
 import bcrypt from 'bcrypt';
 import {
   PERMISSIONS,
@@ -439,6 +440,8 @@ async function seedContent(): Promise<void> {
       console.warn(`   ! skipping comparison ${c.slug} — missing product`);
       continue;
     }
+    // Rich demo overlay (grouped/typed specs + editorial content) for known slugs.
+    const rich = COMPARISON_RICH[c.slug];
     const data = {
       title: c.title,
       excerpt: c.excerpt,
@@ -446,10 +449,26 @@ async function seedContent(): Promise<void> {
       productAId,
       productBId,
       verdict: c.verdict,
-      winner: c.winner,
+      winner: rich?.winner ?? c.winner,
       prosCons: c.prosCons,
       status: 'published' as const,
       publishedAt: new Date('2024-01-15'),
+      ...(rich
+        ? {
+            editorSummary: rich.editorSummary ?? null,
+            whoShouldBuyA: rich.whoShouldBuyA ?? null,
+            whoShouldBuyB: rich.whoShouldBuyB ?? null,
+            bestFor: rich.bestFor ?? null,
+            faq: (rich.faq ?? []) as unknown as Prisma.InputJsonValue,
+            comparisonScoreA: rich.comparisonScoreA ?? null,
+            comparisonScoreB: rich.comparisonScoreB ?? null,
+            featured: rich.featured ?? false,
+            reviewStatus: 'approved' as const,
+            bestAlternativeIds: (rich.alternativeSlugs ?? [])
+              .map((s) => prodBySlug.get(s))
+              .filter((id): id is string => Boolean(id)) as unknown as Prisma.InputJsonValue,
+          }
+        : {}),
     };
     const comparison = await prisma.comparison.upsert({
       where: { slug: c.slug },
@@ -458,7 +477,28 @@ async function seedContent(): Promise<void> {
     });
 
     await prisma.comparisonSpec.deleteMany({ where: { comparisonId: comparison.id } });
-    if (c.categories.length > 0) {
+    if (rich) {
+      await prisma.comparisonSpec.createMany({
+        data: rich.specs.map((s, i) => ({
+          comparisonId: comparison.id,
+          specName: s.specName,
+          specGroup: s.specGroup,
+          displayType: s.displayType,
+          valueType: s.valueType,
+          winnerMode: s.winnerMode,
+          unit: s.unit ?? null,
+          productAValue: s.productAValue ?? null,
+          productBValue: s.productBValue ?? null,
+          numberValueA: s.numberValueA ?? null,
+          numberValueB: s.numberValueB ?? null,
+          booleanValueA: s.booleanValueA ?? null,
+          booleanValueB: s.booleanValueB ?? null,
+          winner: s.winner ?? null,
+          details: s.details ?? null,
+          position: i,
+        })),
+      });
+    } else if (c.categories.length > 0) {
       await prisma.comparisonSpec.createMany({
         data: c.categories.map((s, i) => ({
           comparisonId: comparison.id,

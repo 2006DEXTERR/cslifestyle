@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/products/ProductCard';
 import type { CatalogProduct } from '@/lib/api/catalog';
 import { formatNumber } from '@/lib/format';
+import { productImageClass } from '@/lib/image';
 import { AnalyticsBeacon } from '@/components/analytics/AnalyticsBeacon';
 
 export function ProductDetail({
@@ -82,7 +83,7 @@ export function ProductDetail({
                 <img
                   src={product.images[selectedImage] || product.image}
                   alt={product.name}
-                  className={`w-full h-full object-cover transition-transform duration-300 ${
+                  className={`${productImageClass} transition-transform duration-300 ${
                     isZoomed ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'
                   }`}
                   onClick={() => setIsZoomed(!isZoomed)}
@@ -109,7 +110,7 @@ export function ProductDetail({
                         selectedImage === index ? 'border-primary' : 'border-transparent'
                       }`}
                     >
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <img src={img} alt="" className={productImageClass} />
                     </button>
                   ))}
                 </div>

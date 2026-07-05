@@ -40,6 +40,7 @@ import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { catalogApi, type CatalogProduct, type CatalogCategory, type CatalogBrand } from '@/lib/api/catalog';
 import { contentApi, type ContentGuide, type ContentComparison } from '@/lib/api/content';
 import { subscribeNewsletter } from '@/lib/api/marketing';
+import { productImageClass } from '@/lib/image';
 import { formatNumber } from '@/lib/format';
 
 const fadeInUp = {
@@ -347,19 +348,25 @@ export default function Home() {
             </Link>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {comparisons.map((comparison, index) => (
-              <motion.div
-                key={comparison.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <ComparisonCard comparison={comparison} />
-              </motion.div>
-            ))}
-          </div>
+          {comparisons.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {comparisons.map((comparison, index) => (
+                <motion.div
+                  key={comparison.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <ComparisonCard comparison={comparison} />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed bg-card p-10 text-center">
+              <p className="text-muted-foreground">New product comparisons are on the way — check back soon.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -622,7 +629,7 @@ export default function Home() {
                   <img
                     src={product.image}
                     alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className={`${productImageClass} group-hover:scale-105 transition-transform duration-300`}
                   />
                 </div>
                 <h3 className="font-semibold text-foreground line-clamp-1 mb-1">{product.name}</h3>

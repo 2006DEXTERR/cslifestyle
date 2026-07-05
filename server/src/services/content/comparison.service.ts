@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { ApiError } from '../../lib/http';
 import type { Pagination } from '../../lib/http';
 import { uniqueSlug } from '../../lib/slug';
-import { presentComparison, type PresentedComparison } from './presenters';
+import { presentComparison, type PresentedComparison, type ComparisonRow } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
 import { cacheWrap, bust, CACHE_NS, TTL } from '../../lib/cache';
 import type { ComparisonListQuery, CreateComparisonBody } from '../../validation/content.schemas';
@@ -130,11 +130,33 @@ export async function getComparisonBySlug(
 async function getComparisonBySlugUncached(slug: string, canSeeUnpublished: boolean): Promise<PresentedComparison> {
   const row = await prisma.comparison.findUnique({ where: { slug }, include: FULL_INCLUDE });
   if (!row || (!canSeeUnpublished && row.status !== 'published')) throw ApiError.notFound('Comparison not found');
-  return presentComparison(row);
+  return presentComparison(await attachAlternatives(row));
 }
 
 function comparisonExistsBySlug(slug: string): Promise<string | null> {
   return prisma.comparison.findUnique({ where: { slug }, select: { id: true } }).then((r) => r?.id ?? null);
+}
+
+/** Parse the `bestAlternativeIds` JSON column into a clean string[] of product ids. */
+function altIds(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length > 0) : [];
+}
+
+/**
+ * Resolve `bestAlternativeIds` → published products only, preserving editor order and
+ * excluding the two compared products. Guarantees the frontend never links to a
+ * missing/unpublished product (no fabricated alternatives).
+ */
+async function attachAlternatives(row: ComparisonRow): Promise<ComparisonRow> {
+  const ids = altIds(row.bestAlternativeIds).filter((id) => id !== row.productAId && id !== row.productBId);
+  if (ids.length === 0) return { ...row, alternativeProducts: [] };
+  const found = await prisma.product.findMany({
+    where: { id: { in: ids }, isPublished: true },
+    include: PRODUCT_REL.include,
+  });
+  const byId = new Map(found.map((p) => [p.id, p]));
+  const ordered = ids.map((id) => byId.get(id)).filter((p): p is (typeof found)[number] => Boolean(p));
+  return { ...row, alternativeProducts: ordered };
 }
 
 function scalarData(body: Partial<CreateComparisonBody>): Prisma.ComparisonUncheckedUpdateInput {
@@ -308,5 +330,5 @@ export async function setComparisonStatus(
 async function getComparisonById(id: string): Promise<PresentedComparison> {
   const row = await prisma.comparison.findUnique({ where: { id }, include: FULL_INCLUDE });
   if (!row) throw ApiError.notFound('Comparison not found');
-  return presentComparison(row);
+  return presentComparison(await attachAlternatives(row));
 }

@@ -8,6 +8,7 @@ import { Star, ExternalLink, Clock, TrendingUp, Award, Percent } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { Product } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
+import { productImageClass } from '@/lib/image';
 
 interface ProductCardProps {
   product: Product;
@@ -45,7 +46,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
             <img
               src={product.image}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className={productImageClass}
             />
             {product.trending && (
               <div className="absolute top-1 left-1">
@@ -86,7 +87,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
             <img
               src={product.image}
               alt={product.name}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className={`${productImageClass} transition-transform duration-500 group-hover:scale-105`}
             />
             {product.discount && (
               <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-500 text-white text-xs font-semibold">
@@ -164,7 +165,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
           <img
             src={product.image}
             alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className={`${productImageClass} transition-transform duration-300 group-hover:scale-105`}
           />
           {product.discount && (
             <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/90 text-white text-xs font-medium">

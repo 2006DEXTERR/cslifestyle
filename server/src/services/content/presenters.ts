@@ -166,6 +166,8 @@ export type ComparisonRow = Comparison & {
   productA?: ProductRow | null;
   productB?: ProductRow | null;
   specs?: ComparisonSpec[];
+  /** Resolved published alternative products (from `bestAlternativeIds`), attached by the service. */
+  alternativeProducts?: ProductRow[];
 };
 
 export interface PresentedSpec {
@@ -217,6 +219,8 @@ export interface PresentedComparison {
   whoShouldBuyB: string | null;
   bestFor: string | null;
   bestAlternativeIds: string[];
+  /** Resolved, published alternative products (safe to render — never fabricated). */
+  bestAlternatives: PresentedProduct[];
   faq: { question: string; answer: string }[];
   comparisonNotes: string | null;
   lastReviewedBy: string | null;
@@ -366,6 +370,7 @@ export function presentComparison(c: ComparisonRow): PresentedComparison {
     whoShouldBuyB: c.whoShouldBuyB ?? null,
     bestFor: c.bestFor ?? null,
     bestAlternativeIds: asStringArray(c.bestAlternativeIds),
+    bestAlternatives: (c.alternativeProducts ?? []).map(presentProduct),
     faq: asFaq(c.faq),
     comparisonNotes: c.comparisonNotes ?? null,
     lastReviewedBy: c.lastReviewedBy ?? null,
