@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/products/ProductCard';
 import type { CatalogProduct } from '@/lib/api/catalog';
 import { formatNumber } from '@/lib/format';
-import { productImageClass } from '@/lib/image';
+import { productImageClass, resolveProductImage } from '@/lib/image';
 import { AnalyticsBeacon } from '@/components/analytics/AnalyticsBeacon';
 
 export function ProductDetail({
@@ -81,7 +81,7 @@ export function ProductDetail({
             <div>
               <div className="relative aspect-square rounded-2xl overflow-hidden bg-muted mb-4">
                 <img
-                  src={product.images[selectedImage] || product.image}
+                  src={product.images[selectedImage] || resolveProductImage(product)}
                   alt={product.name}
                   className={`${productImageClass} transition-transform duration-300 ${
                     isZoomed ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'

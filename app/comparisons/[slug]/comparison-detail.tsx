@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Trophy, ChevronRight, Check, X, ExternalLink, Star, ThumbsUp, ThumbsDown, Share2, GitCompare, CalendarClock, Award, IndianRupee } from 'lucide-react';
+import { Trophy, ChevronRight, Check, X, ExternalLink, Star, ThumbsUp, ThumbsDown, Share2, GitCompare, CalendarClock, Award, IndianRupee, Sparkles, MessageSquare, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { ComparisonTable } from '@/components/comparisons/ComparisonTable';
 import { ProductCard } from '@/components/products/ProductCard';
-import { productImageClass } from '@/lib/image';
+import { productImageClass, resolveProductImage } from '@/lib/image';
 import type { ContentComparison } from '@/lib/api/content';
 import { formatNumber, formatDate } from '@/lib/format';
 import { AnalyticsBeacon } from '@/components/analytics/AnalyticsBeacon';
@@ -56,6 +56,22 @@ export function ComparisonDetail({
   const winnerLabel = comparison.winner === 'A' ? shortName(comparison.productA.name)
     : comparison.winner === 'B' ? shortName(comparison.productB.name) : null;
   const sideName = (s: 'A' | 'B') => shortName(s === 'A' ? comparison.productA.name : comparison.productB.name);
+
+  // "Best value" — deterministically derived from real data (never invented): the
+  // cheaper product that is NOT worse on quality (higher/equal CSLifestyle score, or
+  // higher/equal rating when scores are absent). Null when it can't be established.
+  const bestValue: 'A' | 'B' | null = (() => {
+    const cheaper = insights.bestPrice;
+    if (!cheaper) return null;
+    const other: 'A' | 'B' = cheaper === 'A' ? 'B' : 'A';
+    const score = (s: 'A' | 'B') => (s === 'A' ? comparison.comparisonScoreA : comparison.comparisonScoreB);
+    if (typeof score('A') === 'number' && typeof score('B') === 'number') {
+      return score(cheaper)! >= score(other)! ? cheaper : null;
+    }
+    const rating = (s: 'A' | 'B') => (s === 'A' ? comparison.productA.rating : comparison.productB.rating);
+    if (rating('A') > 0 && rating('B') > 0) return rating(cheaper) >= rating(other) ? cheaper : null;
+    return null;
+  })();
 
   return (
     <div className={`min-h-screen ${showStickyCta ? 'pb-24 md:pb-20' : ''}`}>
@@ -122,7 +138,7 @@ export function ComparisonDetail({
               )}
               <div className="aspect-[4/3] overflow-hidden bg-muted">
                 <img
-                  src={comparison.productA.image}
+                  src={resolveProductImage(comparison.productA)}
                   alt={comparison.productA.name}
                   className={productImageClass}
                 />
@@ -142,10 +158,15 @@ export function ComparisonDetail({
                   <p className="text-sm text-muted-foreground mb-3">No ratings yet</p>
                 )}
                 {typeof comparison.comparisonScoreA === 'number' && (
-                  <p className="text-sm mb-4">
-                    <span className="font-semibold text-green-600">{comparison.comparisonScoreA}</span>
-                    <span className="text-muted-foreground">/100 CSLifestyle score</span>
-                  </p>
+                  <div className="mb-4">
+                    <p className="text-sm mb-1.5">
+                      <span className="font-semibold text-green-600">{comparison.comparisonScoreA}</span>
+                      <span className="text-muted-foreground">/100 CSLifestyle score</span>
+                    </p>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={comparison.comparisonScoreA} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="h-full bg-brand-gradient rounded-full" style={{ width: `${comparison.comparisonScoreA}%` }} />
+                    </div>
+                  </div>
                 )}
                 <p className="text-2xl font-bold mb-4">
                   {formatPrice(comparison.productA.currentPrice)}
@@ -191,7 +212,7 @@ export function ComparisonDetail({
               )}
               <div className="aspect-[4/3] overflow-hidden bg-muted">
                 <img
-                  src={comparison.productB.image}
+                  src={resolveProductImage(comparison.productB)}
                   alt={comparison.productB.name}
                   className={productImageClass}
                 />
@@ -211,10 +232,15 @@ export function ComparisonDetail({
                   <p className="text-sm text-muted-foreground mb-3">No ratings yet</p>
                 )}
                 {typeof comparison.comparisonScoreB === 'number' && (
-                  <p className="text-sm mb-4">
-                    <span className="font-semibold text-green-600">{comparison.comparisonScoreB}</span>
-                    <span className="text-muted-foreground">/100 CSLifestyle score</span>
-                  </p>
+                  <div className="mb-4">
+                    <p className="text-sm mb-1.5">
+                      <span className="font-semibold text-green-600">{comparison.comparisonScoreB}</span>
+                      <span className="text-muted-foreground">/100 CSLifestyle score</span>
+                    </p>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={comparison.comparisonScoreB} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="h-full bg-brand-gradient rounded-full" style={{ width: `${comparison.comparisonScoreB}%` }} />
+                    </div>
+                  </div>
                 )}
                 <p className="text-2xl font-bold mb-4">
                   {formatPrice(comparison.productB.currentPrice)}
@@ -238,15 +264,22 @@ export function ComparisonDetail({
         </div>
       </section>
 
-      {/* Smart insights — derived only from real DB fields */}
-      {(winnerLabel || comparison.bestFor || insights.bestPrice || insights.higherRated || insights.specWins.a + insights.specWins.b > 0) && (
+      {/* At a glance — smart decision chips derived only from real DB fields */}
+      {(winnerLabel || comparison.bestFor || insights.bestPrice || insights.higherRated || insights.moreReviewed || bestValue || insights.specWins.a + insights.specWins.b > 0) && (
         <section className="py-6 border-t">
           <div className="container mx-auto px-4">
+            <h2 className="sr-only">At a glance</h2>
             <div className="flex flex-wrap gap-3">
               {winnerLabel && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-gradient text-white text-sm font-medium">
                   <Trophy className="w-4 h-4" aria-hidden="true" />
                   Best Overall: {winnerLabel}
+                </span>
+              )}
+              {bestValue && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-sm font-medium">
+                  <Sparkles className="w-4 h-4" aria-hidden="true" />
+                  Best Value: {sideName(bestValue)}
                 </span>
               )}
               {comparison.bestFor && (
@@ -259,12 +292,19 @@ export function ComparisonDetail({
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600 text-sm font-medium">
                   <IndianRupee className="w-4 h-4" aria-hidden="true" />
                   Best Price: {sideName(insights.bestPrice)}
+                  {insights.priceDiff ? ` (${formatPrice(insights.priceDiff)} less)` : ''}
                 </span>
               )}
               {insights.higherRated && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/10 text-yellow-600 text-sm font-medium">
                   <Star className="w-4 h-4" aria-hidden="true" />
                   Higher Rated: {sideName(insights.higherRated)}
+                </span>
+              )}
+              {insights.moreReviewed && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-muted-foreground text-sm font-medium">
+                  <MessageSquare className="w-4 h-4" aria-hidden="true" />
+                  Most reviewed: {sideName(insights.moreReviewed)}
                 </span>
               )}
               {insights.specWins.a + insights.specWins.b > 0 && (
@@ -387,6 +427,41 @@ export function ComparisonDetail({
                   {comparison.productB.name.split(' ').slice(0, 2).join(' ')} on Amazon
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How we compare — trust signals (real review metadata; methodology copy is factual) */}
+      <section className="py-8 border-t">
+        <div className="container mx-auto px-4 max-w-3xl">
+          <div className="rounded-xl border bg-card p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="w-5 h-5 text-green-600" aria-hidden="true" />
+              <h2 className="text-lg font-semibold">How we compare</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Every CSLifestyle comparison is built from verified specifications and current pricing. Per-spec
+              winners are decided by objective rules — never sponsored placement — and the editorial verdict
+              weighs real-world value for Indian buyers.
+            </p>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <CalendarClock className="w-4 h-4" aria-hidden="true" /> Last reviewed {formatDate(comparison.updatedAt)}
+              </span>
+              {comparison.lastReviewedBy && (
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                  <Award className="w-4 h-4" aria-hidden="true" /> Reviewed by {comparison.lastReviewedBy}
+                </span>
+              )}
+              {comparison.reviewStatus === 'approved' && (
+                <span className="inline-flex items-center gap-1.5 text-green-600">
+                  <ShieldCheck className="w-4 h-4" aria-hidden="true" /> Editorially approved
+                </span>
+              )}
+              <a href="/affiliate-disclosure" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground underline underline-offset-2">
+                Affiliate disclosure
               </a>
             </div>
           </div>

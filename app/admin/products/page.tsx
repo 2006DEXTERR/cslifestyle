@@ -35,7 +35,7 @@ import {
   type CatalogBrand,
 } from '@/lib/api/catalog';
 import { formatNumber, formatDate } from '@/lib/format';
-import { productThumbClass } from '@/lib/image';
+import { productThumbClass, resolveProductImage } from '@/lib/image';
 
 interface ProductRow {
   id: string;
@@ -145,7 +145,7 @@ export default function ProductsAdminPage() {
         header: '',
         cell: ({ row }) => (
           <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted">
-            <img src={row.original.image} alt={row.original.name} className={productThumbClass} />
+            <img src={resolveProductImage(row.original.raw)} alt={row.original.name} className={productThumbClass} />
           </div>
         ),
         enableSorting: false,

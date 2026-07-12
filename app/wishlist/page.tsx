@@ -7,7 +7,7 @@ import { Heart, Trash2, ExternalLink, ShoppingCart, ArrowLeft } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/products/ProductCard';
 import { products } from '@/lib/data';
-import { productThumbClass } from '@/lib/image';
+import { productThumbClass, resolveProductImage } from '@/lib/image';
 
 export default function WishlistPage() {
   const [wishlistItems, setWishlistItems] = React.useState(products.slice(0, 4));
@@ -93,7 +93,7 @@ export default function WishlistPage() {
                             <Link href={`/products/${product.slug}`} className="flex items-center gap-4">
                               <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                                 <img
-                                  src={product.image}
+                                  src={resolveProductImage(product)}
                                   alt={product.name}
                                   className={productThumbClass}
                                 />
@@ -169,7 +169,7 @@ export default function WishlistPage() {
                       <div className="flex gap-4 p-4">
                         <Link href={`/products/${product.slug}`} className="w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                           <img
-                            src={product.image}
+                            src={resolveProductImage(product)}
                             alt={product.name}
                             className={productThumbClass}
                           />

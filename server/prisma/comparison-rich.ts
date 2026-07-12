@@ -32,6 +32,8 @@ export interface RichComparison {
   comparisonScoreA?: number;
   comparisonScoreB?: number;
   featured?: boolean;
+  /** Reviewer credit surfaced in the "How we compare" trust block. */
+  lastReviewedBy?: string;
   winner?: 'A' | 'B' | 'tie';
   /** Product slugs (existing seed products) surfaced as "Recommended Alternatives". */
   alternativeSlugs?: string[];
@@ -67,6 +69,7 @@ export const COMPARISON_RICH: Record<string, RichComparison> = {
     comparisonScoreA: 92,
     comparisonScoreB: 94,
     bestFor: 'Premium flagship buyers',
+    lastReviewedBy: 'CSLifestyle Reviews Team',
     alternativeSlugs: ['oneplus-12'],
     editorSummary:
       "Two of the finest flagships you can buy. The Galaxy S24 Ultra edges ahead on display, battery, zoom range and the built-in S Pen; the iPhone 15 Pro Max counters with class-leading video, tighter integration and a lighter build.",
@@ -102,6 +105,7 @@ export const COMPARISON_RICH: Record<string, RichComparison> = {
     comparisonScoreA: 86,
     comparisonScoreB: 84,
     bestFor: 'Budget wireless earbuds',
+    lastReviewedBy: 'CSLifestyle Audio Desk',
     alternativeSlugs: ['samsung-galaxy-buds-pro-2', 'sony-wh-1000xm5'],
     editorSummary:
       'Two of India’s most popular value earbud brands. boAt wins on battery life and price, while the Noise pair offers a more balanced sound signature and solid ANC for the money.',
@@ -127,6 +131,7 @@ export const COMPARISON_RICH: Record<string, RichComparison> = {
     comparisonScoreA: 93,
     comparisonScoreB: 89,
     bestFor: 'Premium creator laptops',
+    lastReviewedBy: 'CSLifestyle Computing Desk',
     editorSummary:
       'The MacBook Pro 14" leads on battery life, efficiency and sustained performance, while the Dell XPS 15 offers a stunning OLED option, a discrete NVIDIA GPU and the flexibility of Windows.',
     whoShouldBuyA: 'Buy the MacBook Pro if you want the best battery life, silent efficient performance, and a first-class macOS creative workflow.',

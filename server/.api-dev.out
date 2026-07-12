@@ -1,0 +1,698 @@
+
+> cslifestyle-server@0.1.0 dev
+> tsx watch src/index.ts
+
+[2026-06-24 23:47:37.156 +0530] [32mINFO[39m: [36m🚀 CSLifestyle API listening on http://0.0.0.0:4000 (development) — docs at /docs, health at /healthz[39m
+    [35mservice[39m: "cslifestyle-api"
+[2026-06-24 23:47:37.648 +0530] [32mINFO[39m: [36mRedis connected[39m
+    [35mservice[39m: "cslifestyle-api"
+[2026-06-24 23:49:05.292 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "d461515e-3b4f-4098-be69-c4a7ae1bd8a1",
+      "method": "GET",
+      "url": "/api/categories",
+      "query": {},
+      "params": {},
+      "headers": {
+        "user-agent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.8655",
+        "host": "127.0.0.1:4000",
+        "connection": "Keep-Alive"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62951
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "d461515e-3b4f-4098-be69-c4a7ae1bd8a1",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "599",
+        "ratelimit-reset": "900",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "5631",
+        "etag": "W/\"15ff-jzNsbuaWjFLmROIg7Td4RhdE3A4\""
+      }
+    }
+    [35mresponseTime[39m: 1407
+[2026-06-24 23:49:06.496 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "270b6cca-eea3-459c-bb32-85a9deff9836",
+      "method": "GET",
+      "url": "/api/categories/smartphones",
+      "query": {},
+      "params": {},
+      "headers": {
+        "user-agent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.8655",
+        "host": "127.0.0.1:4000"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62951
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "270b6cca-eea3-459c-bb32-85a9deff9836",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "598",
+        "ratelimit-reset": "899",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "660",
+        "etag": "W/\"294-PM2vqel9wY+UikT8RfbkkcPZCDI\""
+      }
+    }
+    [35mresponseTime[39m: 1112
+[2026-06-24 23:49:07.074 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "e2131dde-b520-426c-950b-c1433505e882",
+      "method": "GET",
+      "url": "/api/categories/televisions",
+      "query": {},
+      "params": {},
+      "headers": {
+        "user-agent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.8655",
+        "host": "127.0.0.1:4000"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62951
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "e2131dde-b520-426c-950b-c1433505e882",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "597",
+        "ratelimit-reset": "898",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "573",
+        "etag": "W/\"23d-H34G4NL9IJMzJtqz+4KpaCmpub8\""
+      }
+    }
+    [35mresponseTime[39m: 543
+[2026-06-24 23:49:07.642 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "d1c06d4d-40cb-472c-961b-ff092f5d41bd",
+      "method": "GET",
+      "url": "/api/categories/home-appliances",
+      "query": {},
+      "params": {},
+      "headers": {
+        "user-agent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.8655",
+        "host": "127.0.0.1:4000"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62951
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "d1c06d4d-40cb-472c-961b-ff092f5d41bd",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "596",
+        "ratelimit-reset": "897",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "641",
+        "etag": "W/\"281-mVZiXSHrIiwHN8XhGl7+io4YvrI\""
+      }
+    }
+    [35mresponseTime[39m: 554
+[2026-06-24 23:50:22.035 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "9c9e6151-1c93-453b-95df-c778a7792b12",
+      "method": "GET",
+      "url": "/api/categories?parent=all",
+      "query": {
+        "parent": "all"
+      },
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62972
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "9c9e6151-1c93-453b-95df-c778a7792b12",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "595",
+        "ratelimit-reset": "823",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "5631",
+        "etag": "W/\"15ff-jzNsbuaWjFLmROIg7Td4RhdE3A4\""
+      }
+    }
+    [35mresponseTime[39m: 1083
+[2026-06-24 23:50:22.661 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "72c84fee-5041-4e99-99c9-ae2e6dfe8579",
+      "method": "GET",
+      "url": "/api/categories/smartphones",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62973
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "72c84fee-5041-4e99-99c9-ae2e6dfe8579",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "594",
+        "ratelimit-reset": "822",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "660",
+        "etag": "W/\"294-PM2vqel9wY+UikT8RfbkkcPZCDI\""
+      }
+    }
+    [35mresponseTime[39m: 538
+[2026-06-24 23:50:25.381 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "99afe50e-74f2-444c-adcf-543c348fef34",
+      "method": "GET",
+      "url": "/api/guides?category=smartphones&perPage=6",
+      "query": {
+        "category": "smartphones",
+        "perPage": "6"
+      },
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62973
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "99afe50e-74f2-444c-adcf-543c348fef34",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "593",
+        "ratelimit-reset": "822",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "1974",
+        "etag": "W/\"7b6-GwD7fzhgVfgx2rIlJLn8NnOsq2Y\""
+      }
+    }
+    [35mresponseTime[39m: 2709
+[2026-06-24 23:50:27.929 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "35cc3ed0-eab6-4d40-a34f-9a69bd2bc25e",
+      "method": "GET",
+      "url": "/api/products?category=smartphones&perPage=100",
+      "query": {
+        "category": "smartphones",
+        "perPage": "100"
+      },
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62974
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "35cc3ed0-eab6-4d40-a34f-9a69bd2bc25e",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "592",
+        "ratelimit-reset": "822",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "6258",
+        "etag": "W/\"1872-2hw0C5DuFMMwx10ORYXXZoQ9eJ4\""
+      }
+    }
+    [35mresponseTime[39m: 5254
+[2026-06-24 23:50:29.152 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "e799a3bd-0498-4ed8-8139-fcafea56bd60",
+      "method": "GET",
+      "url": "/api/categories/televisions",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62973
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "e799a3bd-0498-4ed8-8139-fcafea56bd60",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "591",
+        "ratelimit-reset": "816",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "573",
+        "etag": "W/\"23d-H34G4NL9IJMzJtqz+4KpaCmpub8\""
+      }
+    }
+    [35mresponseTime[39m: 1103
+[2026-06-24 23:50:30.758 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "8870f206-5ee2-481c-bbf2-f76783ba5823",
+      "method": "GET",
+      "url": "/api/guides?category=televisions&perPage=6",
+      "query": {
+        "category": "televisions",
+        "perPage": "6"
+      },
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62974
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "8870f206-5ee2-481c-bbf2-f76783ba5823",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "589",
+        "ratelimit-reset": "815",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "1909",
+        "etag": "W/\"775-8vIZdv7rcCkrMVRfjG71khnO+8k\""
+      }
+    }
+    [35mresponseTime[39m: 1600
+[2026-06-24 23:50:31.632 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "3d41c180-9158-4179-9b21-4ec3d53b9467",
+      "method": "GET",
+      "url": "/api/products?category=televisions&perPage=100",
+      "query": {
+        "category": "televisions",
+        "perPage": "100"
+      },
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62973
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "3d41c180-9158-4179-9b21-4ec3d53b9467",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "590",
+        "ratelimit-reset": "815",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "1767",
+        "etag": "W/\"6e7-DO2Yc8PTIINmHImoC1CVl26OCZs\""
+      }
+    }
+    [35mresponseTime[39m: 2475
+[2026-06-24 23:50:32.266 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "24b283e7-f7b5-4b4d-a30b-aa3215a932d0",
+      "method": "GET",
+      "url": "/api/categories/home-appliances",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62973
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "24b283e7-f7b5-4b4d-a30b-aa3215a932d0",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "588",
+        "ratelimit-reset": "813",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "641",
+        "etag": "W/\"281-mVZiXSHrIiwHN8XhGl7+io4YvrI\""
+      }
+    }
+    [35mresponseTime[39m: 543
+[2026-06-24 23:50:33.888 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "aae2b57f-7615-4335-9a22-49d8a9846e37",
+      "method": "GET",
+      "url": "/api/products?category=home-appliances&perPage=100",
+      "query": {
+        "category": "home-appliances",
+        "perPage": "100"
+      },
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62974
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "aae2b57f-7615-4335-9a22-49d8a9846e37",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "586",
+        "ratelimit-reset": "812",
+        "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "127",
+        "etag": "W/\"7f-4mgo1fG4K9aCq9+Ol7PRDh3V5BY\""
+      }
+    }
+    [35mresponseTime[39m: 1616
+[2026-06-24 23:50:33.933 +0530] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "cslifestyle-api"
+    [35mreq[39m: {
+      "id": "46af8ca7-fd1b-4093-a943-697bb9799a9a",
+      "method": "GET",
+      "url": "/api/guides?category=home-appliances&perPage=6",
+      "query": {
+        "category": "home-appliances",
+        "perPage": "6"
+      },
+      "params": {},
+      "headers": {
+        "host": "127.0.0.1:4000",
+        "connection": "keep-alive",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate"
+      },
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62973
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-request-id": "46af8ca7-fd1b-4093-a943-697bb9799a9a",
+        "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+        "cross-origin-opener-policy": "same-origin",
+        "cross-origin-resource-policy": "same-origin",
+        "origin-agent-cluster": "?1",
+        "referrer-policy": "no-referrer",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-dns-prefetch-control": "off",
+        "x-download-options": "noopen",
+        "x-frame-options": "SAMEORIGIN",
+        "x-permitted-cross-domain-policies": "none",
+        "x-xss-protection": "0",
+        "vary": "Origin",
+        "access-control-allow-credentials": "true",
+        "ratelimit-policy": "600;w=900",
+        "ratelimit-limit": "600",
+        "ratelimit-remaining": "587",
+        "ratelimit-reset": "812",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "125",
+        "etag": "W/\"7d-sNZvoLUIYqJoXDtizPMEgQvg+L8\""
+      }
+    }
+    [35mresponseTime[39m: 1662
+11:58:26 pm [tsx] change in ./src\config\env.ts Restarting...
+c[2026-06-24 23:58:28.747 +0530] [32mINFO[39m: [36m🚀 CSLifestyle API listening on http://0.0.0.0:4000 (development) — docs at /docs, health at /healthz[39m
+    [35mservice[39m: "cslifestyle-api"
+[2026-06-24 23:58:28.952 +0530] [32mINFO[39m: [36mRedis connected[39m
+    [35mservice[39m: "cslifestyle-api"
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }

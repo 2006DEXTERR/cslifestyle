@@ -8,7 +8,7 @@ import { Star, ExternalLink, Clock, TrendingUp, Award, Percent } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { Product } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
-import { productThumbClass } from '@/lib/image';
+import { productThumbClass, resolveProductImage } from '@/lib/image';
 
 interface ProductCardProps {
   product: Product;
@@ -48,7 +48,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
         >
           <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
             <img
-              src={product.image}
+              src={resolveProductImage(product)}
               alt={product.name}
               className={productThumbClass}
             />
@@ -89,7 +89,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
           {/* Image */}
           <div className="relative aspect-square overflow-hidden bg-muted">
             <img
-              src={product.image}
+              src={resolveProductImage(product)}
               alt={product.name}
               className={`${productThumbClass} transition-transform duration-500 group-hover:scale-105`}
             />
@@ -167,7 +167,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
         {/* Image */}
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
           <img
-            src={product.image}
+            src={resolveProductImage(product)}
             alt={product.name}
             className={`${productThumbClass} transition-transform duration-300 group-hover:scale-105`}
           />

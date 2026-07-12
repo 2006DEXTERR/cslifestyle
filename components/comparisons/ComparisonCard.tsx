@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, Trophy } from 'lucide-react';
 import { Comparison } from '@/lib/types';
-import { productThumbClass } from '@/lib/image';
+import { productThumbClass, resolveProductImage } from '@/lib/image';
 
 interface ComparisonCardProps {
   comparison: Comparison;
@@ -23,7 +23,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
           <div className="flex items-center gap-2">
             <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted">
               <img
-                src={comparison.productA.image}
+                src={resolveProductImage(comparison.productA)}
                 alt={comparison.productA.name}
                 className={productThumbClass}
               />
@@ -31,7 +31,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
             <span className="text-muted-foreground">vs</span>
             <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted">
               <img
-                src={comparison.productB.image}
+                src={resolveProductImage(comparison.productB)}
                 alt={comparison.productB.name}
                 className={productThumbClass}
               />
@@ -57,7 +57,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
         <div className="relative flex items-center justify-center gap-4 p-6 bg-gradient-to-b from-muted/50 to-background">
           <div className="relative w-28 h-28 rounded-xl overflow-hidden bg-background border shadow-sm">
             <img
-              src={comparison.productA.image}
+              src={resolveProductImage(comparison.productA)}
               alt={comparison.productA.name}
               className={productThumbClass}
             />
@@ -75,7 +75,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
 
           <div className="relative w-28 h-28 rounded-xl overflow-hidden bg-background border shadow-sm">
             <img
-              src={comparison.productB.image}
+              src={resolveProductImage(comparison.productB)}
               alt={comparison.productB.name}
               className={productThumbClass}
             />

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { contentApi, ContentApiError, type ContentComparison, type ComparisonSpecView } from '@/lib/api/content';
 import { catalogApi, type CatalogProduct } from '@/lib/api/catalog';
 import { formatDate } from '@/lib/format';
-import { productThumbClass } from '@/lib/image';
+import { productThumbClass, resolveProductImage } from '@/lib/image';
 
 export default function ComparisonsAdminPage() {
   const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
@@ -101,7 +101,7 @@ export default function ComparisonsAdminPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden">
-                          {comparison.productA?.image && <img src={comparison.productA.image} alt="" className={productThumbClass} />}
+                          <img src={resolveProductImage(comparison.productA)} alt="" className={productThumbClass} />
                         </div>
                         <div>
                           <p className="text-sm font-medium">{comparison.productA?.name}</p>
@@ -111,7 +111,7 @@ export default function ComparisonsAdminPage() {
                       <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden">
-                          {comparison.productB?.image && <img src={comparison.productB.image} alt="" className={productThumbClass} />}
+                          <img src={resolveProductImage(comparison.productB)} alt="" className={productThumbClass} />
                         </div>
                         <div>
                           <p className="text-sm font-medium">{comparison.productB?.name}</p>
@@ -370,6 +370,7 @@ function ComparisonBuilder({
     scoreA: '',
     scoreB: '',
     reviewStatus: 'draft' as 'draft' | 'in_review' | 'approved',
+    lastReviewedBy: '',
     featured: false,
     stickyCta: false,
   };
@@ -410,6 +411,7 @@ function ComparisonBuilder({
         scoreA: comparison.comparisonScoreA !== null && comparison.comparisonScoreA !== undefined ? String(comparison.comparisonScoreA) : '',
         scoreB: comparison.comparisonScoreB !== null && comparison.comparisonScoreB !== undefined ? String(comparison.comparisonScoreB) : '',
         reviewStatus: (['draft', 'in_review', 'approved'].includes(comparison.reviewStatus) ? comparison.reviewStatus : 'draft') as 'draft' | 'in_review' | 'approved',
+        lastReviewedBy: comparison.lastReviewedBy ?? '',
         featured: Boolean(comparison.featured),
         stickyCta: Boolean(comparison.stickyCta),
       });
@@ -504,6 +506,7 @@ function ComparisonBuilder({
       // ── Rich editorial fields ──
       editorSummary: form.editorSummary || undefined,
       bestFor: form.bestFor.trim() || undefined,
+      lastReviewedBy: form.lastReviewedBy.trim() || undefined,
       whoShouldBuyA: form.whoShouldBuyA || undefined,
       whoShouldBuyB: form.whoShouldBuyB || undefined,
       comparisonScoreA: scoreOrUndefined(form.scoreA),
@@ -796,13 +799,19 @@ function ComparisonBuilder({
                       <Input type="number" min={0} max={100} value={form.scoreB} onChange={(e) => set('scoreB', e.target.value)} />
                     </div>
                   </div>
-                  <div className="space-y-2 max-w-xs">
-                    <label className="text-sm font-medium">Review status</label>
-                    <select className="w-full h-10 rounded-lg border bg-background px-3" value={form.reviewStatus} onChange={(e) => set('reviewStatus', e.target.value)}>
-                      <option value="draft">Draft</option>
-                      <option value="in_review">In review</option>
-                      <option value="approved">Approved</option>
-                    </select>
+                  <div className="grid sm:grid-cols-2 gap-4 max-w-xl">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Review status</label>
+                      <select className="w-full h-10 rounded-lg border bg-background px-3" value={form.reviewStatus} onChange={(e) => set('reviewStatus', e.target.value)}>
+                        <option value="draft">Draft</option>
+                        <option value="in_review">In review</option>
+                        <option value="approved">Approved</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reviewed by</label>
+                      <Input placeholder="e.g. CSLifestyle Team" value={form.lastReviewedBy} onChange={(e) => set('lastReviewedBy', e.target.value)} />
+                    </div>
                   </div>
                   <div className="flex flex-col gap-3">
                     <label className="inline-flex items-center gap-2 text-sm">

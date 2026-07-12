@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { COMPARISON_RICH } from './comparison-rich';
+import { PRODUCT_IMAGES } from './product-images';
 import bcrypt from 'bcrypt';
 import {
   PERMISSIONS,
@@ -314,6 +315,13 @@ async function seedCatalog(): Promise<void> {
     const affiliateUrl =
       resolveAffiliateUrl(asin, p.affiliateUrl, { tag: 'cslifestyle-21', domain: 'amazon.in' }) || null;
 
+    // Canonical per-product image (verified catalog). Overrides the generic lib/data
+    // stock image so EVERY reseed restores the real product photo. Falls back to the
+    // mock image only when a slug has no canonical entry. Both Product.image and the
+    // ProductImage rows below use this same resolved value.
+    const primaryImage = PRODUCT_IMAGES[p.slug] ?? p.image;
+    const imageUrls = PRODUCT_IMAGES[p.slug] ? [PRODUCT_IMAGES[p.slug]] : p.images;
+
     const data = {
       asin,
       categoryId,
@@ -321,8 +329,8 @@ async function seedCatalog(): Promise<void> {
       title: p.name,
       shortDescription: p.description.slice(0, 280),
       description: p.description,
-      image: p.image,
-      gallery: p.images,
+      image: primaryImage,
+      gallery: imageUrls,
       specifications: p.specifications,
       highlights: p.highlights,
       features: p.features,
@@ -350,11 +358,11 @@ async function seedCatalog(): Promise<void> {
       create: { slug: p.slug, ...data },
     });
 
-    // Resync gallery images (ProductImage normalised table).
+    // Resync gallery images (ProductImage normalised table) — same canonical URLs.
     await prisma.productImage.deleteMany({ where: { productId: product.id } });
-    if (p.images.length > 0) {
+    if (imageUrls.length > 0) {
       await prisma.productImage.createMany({
-        data: p.images.map((imageUrl, idx) => ({ productId: product.id, imageUrl, sortOrder: idx })),
+        data: imageUrls.map((imageUrl, idx) => ({ productId: product.id, imageUrl, sortOrder: idx })),
       });
     }
 
@@ -464,6 +472,7 @@ async function seedContent(): Promise<void> {
             comparisonScoreB: rich.comparisonScoreB ?? null,
             featured: rich.featured ?? false,
             reviewStatus: 'approved' as const,
+            lastReviewedBy: rich.lastReviewedBy ?? null,
             bestAlternativeIds: (rich.alternativeSlugs ?? [])
               .map((s) => prodBySlug.get(s))
               .filter((id): id is string => Boolean(id)) as unknown as Prisma.InputJsonValue,

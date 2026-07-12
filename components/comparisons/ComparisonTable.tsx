@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Trophy, Search, Check, X, Star } from 'lucide-react';
+import { Trophy, Search, Check, X, Star, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ComparisonSpecView } from '@/lib/api/content';
 
@@ -31,6 +31,29 @@ const inr = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', c
 export function ComparisonTable({ rows, labelA, labelB, brandA, brandB }: ComparisonTableProps) {
   const [query, setQuery] = React.useState('');
   const [onlyDiff, setOnlyDiff] = React.useState(false);
+  // Collapsible spec groups (scanability on long comparisons). Everything starts
+  // expanded — nothing is hidden by default — but a group can be folded away.
+  const [collapsed, setCollapsed] = React.useState<Set<string>>(new Set());
+  const toggleGroup = (g: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
+  // While searching, force-expand so matches are never hidden inside a folded group.
+  const isCollapsed = (g: string) => collapsed.has(g) && !query;
+
+  // Per-group winner tally ("brandA 3 · brandB 5") — a quick "who wins here" read.
+  const groupWins = (groupRows: ComparisonSpecView[]) =>
+    groupRows.reduce(
+      (acc, r) => {
+        if (r.winner === 'A') acc.a += 1;
+        else if (r.winner === 'B') acc.b += 1;
+        return acc;
+      },
+      { a: 0, b: 0 },
+    );
 
   const diffCount = React.useMemo(() => rows.filter((r) => differs(r.productA, r.productB)).length, [rows]);
 
@@ -168,14 +191,34 @@ export function ComparisonTable({ rows, labelA, labelB, brandA, brandB }: Compar
                   <th scope="col" className="sticky top-0 z-10 bg-muted/60 backdrop-blur text-center p-4 font-semibold">Winner</th>
                 </tr>
               </thead>
-              {groups.map(([group, groupRows]) => (
+              {groups.map(([group, groupRows]) => {
+                const wins = groupWins(groupRows);
+                const folded = isCollapsed(group);
+                return (
                 <tbody key={group}>
                   <tr>
-                    <th scope="colgroup" colSpan={4} className="sticky left-0 z-10 bg-muted/30 text-left px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {group}
+                    <th scope="colgroup" colSpan={4} className="sticky left-0 z-10 bg-muted/30 p-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group)}
+                        aria-expanded={!folded}
+                        className="w-full flex items-center justify-between gap-2 px-4 py-2 text-left hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      >
+                        <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <ChevronDown className={cn('w-4 h-4 transition-transform', folded && '-rotate-90')} aria-hidden="true" />
+                          {group}
+                        </span>
+                        {wins.a + wins.b > 0 && (
+                          <span className="text-xs">
+                            {wins.a > 0 && <span className="text-green-600 font-medium">{brandA} {wins.a}</span>}
+                            {wins.a > 0 && wins.b > 0 && <span className="mx-1 text-muted-foreground">·</span>}
+                            {wins.b > 0 && <span className="text-green-600 font-medium">{brandB} {wins.b}</span>}
+                          </span>
+                        )}
+                      </button>
                     </th>
                   </tr>
-                  {groupRows.map((r) => {
+                  {!folded && groupRows.map((r) => {
                     const isDiff = differs(r.productA, r.productB);
                     return (
                       <tr key={r.name} className={cn('border-t', !isDiff && 'opacity-70')}>
@@ -200,15 +243,37 @@ export function ComparisonTable({ rows, labelA, labelB, brandA, brandB }: Compar
                     );
                   })}
                 </tbody>
-              ))}
+                );
+              })}
             </table>
           </div>
 
           {/* Mobile stacked cards, grouped */}
           <div className="md:hidden space-y-5">
-            {groups.map(([group, groupRows]) => (
+            {groups.map(([group, groupRows]) => {
+              const wins = groupWins(groupRows);
+              const folded = isCollapsed(group);
+              return (
               <div key={group}>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{group}</h3>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group)}
+                  aria-expanded={!folded}
+                  className="w-full flex items-center justify-between gap-2 mb-2 focus-visible:outline-none"
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <ChevronDown className={cn('w-4 h-4 transition-transform', folded && '-rotate-90')} aria-hidden="true" />
+                    {group}
+                  </span>
+                  {wins.a + wins.b > 0 && (
+                    <span className="text-xs">
+                      {wins.a > 0 && <span className="text-green-600 font-medium">{brandA} {wins.a}</span>}
+                      {wins.a > 0 && wins.b > 0 && <span className="mx-1 text-muted-foreground">·</span>}
+                      {wins.b > 0 && <span className="text-green-600 font-medium">{brandB} {wins.b}</span>}
+                    </span>
+                  )}
+                </button>
+                {!folded && (
                 <ul className="space-y-3">
                   {groupRows.map((r) => (
                     <li key={r.name} className="rounded-xl border bg-card p-4">
@@ -229,8 +294,10 @@ export function ComparisonTable({ rows, labelA, labelB, brandA, brandB }: Compar
                     </li>
                   ))}
                 </ul>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

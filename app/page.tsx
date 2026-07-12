@@ -40,7 +40,7 @@ import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { catalogApi, type CatalogProduct, type CatalogCategory, type CatalogBrand } from '@/lib/api/catalog';
 import { contentApi, type ContentGuide, type ContentComparison } from '@/lib/api/content';
 import { subscribeNewsletter } from '@/lib/api/marketing';
-import { productThumbClass } from '@/lib/image';
+import { productThumbClass, resolveProductImage } from '@/lib/image';
 import { formatNumber } from '@/lib/format';
 
 const fadeInUp = {
@@ -627,7 +627,7 @@ export default function Home() {
                 </div>
                 <div className="aspect-square rounded-lg bg-muted mb-3 overflow-hidden">
                   <img
-                    src={product.image}
+                    src={resolveProductImage(product)}
                     alt={product.name}
                     className={`${productThumbClass} group-hover:scale-105 transition-transform duration-300`}
                   />
