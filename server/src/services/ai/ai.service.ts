@@ -212,7 +212,7 @@ export async function getStats(): Promise<Record<string, unknown>> {
     doneJobs,
     failedJobs,
     pendingReview,
-    activeProviders: providers.filter((p) => p.status === 'active').length,
+    activeProviders: providers.filter((p) => isUsable(p.status)).length,
     totalProviders: providers.length,
   };
 }
@@ -238,24 +238,96 @@ export async function listLogs(q: LogsQuery): Promise<{ items: unknown[]; pagina
   };
 }
 
+/**
+ * Provider status — the single source of truth shared with the admin UI:
+ *   - 'active'         → this provider actually serves requests right now
+ *                        (AI_DRIVER=live, key configured, first usable in order).
+ *   - 'configured'     → key is configured but it is NOT the selected/used one
+ *                        (a live fallback, or any real provider while in mock mode).
+ *   - 'not_configured' → required API key env var is missing.
+ *   - 'mock'           → the built-in mock driver, active because AI_DRIVER=mock.
+ * A real external provider is NEVER 'active' unless AI_DRIVER=live AND its key is set.
+ */
+export type ProviderStatus = 'active' | 'configured' | 'not_configured' | 'mock';
+
 interface ProviderView {
   id: string;
   name: string;
-  status: 'active' | 'inactive';
+  status: ProviderStatus;
   primary: boolean;
   models: string[];
+  /** Env var name(s) that must be set for this provider to become usable (empty for mock). */
+  requiredEnv: string[];
+}
+
+type RealProviderId = 'anthropic' | 'openai' | 'gemini';
+const REAL_PROVIDERS: { id: RealProviderId; name: string; model: () => string; env: string }[] = [
+  { id: 'anthropic', name: 'Anthropic', model: () => env.ANTHROPIC_MODEL, env: 'ANTHROPIC_API_KEY' },
+  { id: 'openai', name: 'OpenAI', model: () => env.OPENAI_MODEL, env: 'OPENAI_API_KEY' },
+  { id: 'gemini', name: 'Google AI', model: () => env.GOOGLE_AI_MODEL, env: 'GOOGLE_AI_API_KEY' },
+];
+
+/**
+ * Pure status resolver (unit-tested). Given the runtime driver mode, the selected
+ * primary, and which real providers have their key configured, decide each
+ * provider's status. In live mode only the first configured provider in order
+ * (primary first) is "active"; every other configured provider is "configured"
+ * (not selected). In mock mode no real provider is active — the mock driver is.
+ */
+export function resolveProviderStatuses(opts: {
+  live: boolean;
+  primary: RealProviderId;
+  configured: Record<RealProviderId, boolean>;
+}): Record<RealProviderId | 'mock', ProviderStatus> {
+  const ids: RealProviderId[] = ['anthropic', 'openai', 'gemini'];
+  const order: RealProviderId[] = [opts.primary, ...ids.filter((id) => id !== opts.primary)];
+  const firstUsable = opts.live ? order.find((id) => opts.configured[id]) ?? null : null;
+
+  const realStatus = (id: RealProviderId): ProviderStatus => {
+    if (!opts.configured[id]) return 'not_configured';
+    if (!opts.live) return 'configured'; // key present, but mock mode is on → not in use
+    return id === firstUsable ? 'active' : 'configured';
+  };
+
+  return {
+    anthropic: realStatus('anthropic'),
+    openai: realStatus('openai'),
+    gemini: realStatus('gemini'),
+    mock: opts.live ? 'not_configured' : 'mock',
+  };
 }
 
 /** Configured providers + status (FR-053). Drives the AI Providers tab. */
 export function listProviders(): ProviderView[] {
   const primary = env.AI_PRIMARY_PROVIDER;
-  const mock = env.AI_DRIVER === 'mock';
+  const statuses = resolveProviderStatuses({
+    live: env.AI_DRIVER === 'live',
+    primary,
+    configured: {
+      anthropic: providerConfigured('anthropic'),
+      openai: providerConfigured('openai'),
+      gemini: providerConfigured('gemini'),
+    },
+  });
+
+  const real: ProviderView[] = REAL_PROVIDERS.map((p) => ({
+    id: p.id,
+    name: p.name,
+    models: [p.model()],
+    status: statuses[p.id],
+    primary: primary === p.id,
+    requiredEnv: [p.env],
+  }));
+
   return [
-    { id: 'anthropic', name: 'Anthropic', models: [env.ANTHROPIC_MODEL], status: providerConfigured('anthropic') || mock ? 'active' : 'inactive', primary: primary === 'anthropic' },
-    { id: 'openai', name: 'OpenAI', models: [env.OPENAI_MODEL], status: providerConfigured('openai') ? 'active' : 'inactive', primary: primary === 'openai' },
-    { id: 'gemini', name: 'Google AI', models: [env.GOOGLE_AI_MODEL], status: providerConfigured('gemini') ? 'active' : 'inactive', primary: primary === 'gemini' },
-    { id: 'mock', name: 'Local (Mock)', models: ['mock'], status: mock ? 'active' : 'inactive', primary: false },
+    ...real,
+    { id: 'mock', name: 'Local (Mock)', models: ['mock'], status: statuses.mock, primary: false, requiredEnv: [] },
   ];
+}
+
+/** Providers that can serve a request right now (the live selected one, or mock). */
+function isUsable(status: ProviderStatus): boolean {
+  return status === 'active' || status === 'mock';
 }
 
 /** Providers with usage rolled up from AiLog (tokens + cost + last used). */

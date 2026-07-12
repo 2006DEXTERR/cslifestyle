@@ -6,8 +6,10 @@ import { requireCsrf } from '../middleware/csrf';
 import { validateBody } from '../middleware/validate';
 import { auditLogger } from '../middleware/audit';
 import {
+  createUserSchema,
   updateUserSchema,
   updateUserStatusSchema,
+  createRoleSchema,
   updateRoleSchema,
   updateSettingsSchema,
 } from '../validation/admin.schemas';
@@ -63,6 +65,15 @@ adminRouter.get(
   requirePermission('users.view'),
   asyncHandler(access.listUsers),
 );
+adminRouter.post(
+  '/users',
+  authenticate,
+  requireCsrf,
+  requirePermission('users.create'),
+  validateBody(createUserSchema),
+  auditLogger('users.create', 'users'),
+  asyncHandler(access.createUser),
+);
 
 /**
  * @openapi
@@ -115,6 +126,14 @@ adminRouter.patch(
   auditLogger('users.status', 'users'),
   asyncHandler(access.updateUserStatus),
 );
+adminRouter.delete(
+  '/users/:id',
+  authenticate,
+  requireCsrf,
+  requirePermission('users.delete'),
+  auditLogger('users.delete', 'users'),
+  asyncHandler(access.deleteUser),
+);
 
 // ───────────────────────── Roles ─────────────────────────
 
@@ -131,6 +150,15 @@ adminRouter.get(
   authenticate,
   requirePermission('roles.view'),
   asyncHandler(access.listRoles),
+);
+adminRouter.post(
+  '/roles',
+  authenticate,
+  requireCsrf,
+  requirePermission('roles.create'),
+  validateBody(createRoleSchema),
+  auditLogger('roles.create', 'roles'),
+  asyncHandler(access.createRole),
 );
 
 /**

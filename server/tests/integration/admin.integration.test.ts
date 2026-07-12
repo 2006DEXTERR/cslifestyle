@@ -95,6 +95,64 @@ describe.skipIf(!RUN)('admin management integration (DB)', () => {
     expect(deact.body.data.status).toBe('inactive');
   });
 
+  it('admin creates a user, then a plain user is forbidden from creating one', async () => {
+    const { agent, csrf } = await adminSession();
+    const roles = await agent.get('/api/roles');
+    const editorRole = roles.body.data.find((r: { name: string }) => r.name === 'editor');
+    const email = `created_${randomUUID()}@example.com`;
+    const res = await agent
+      .post('/api/users')
+      .set('x-csrf-token', csrf)
+      .send({ name: 'Created User', email, roleId: editorRole.id, password: USER_PASSWORD });
+    expect(res.status).toBe(201);
+    expect(res.body.data.email).toBe(email);
+    expect(res.body.data.role).toBe('editor');
+    expect(res.body.data.passwordHash).toBeUndefined();
+
+    // The created user can authenticate (pre-verified) and is a plain admin-less editor for RBAC purposes.
+    const { agent: plain, csrf: pcsrf } = await userSession();
+    const forbidden = await plain
+      .post('/api/users')
+      .set('x-csrf-token', pcsrf)
+      .send({ name: 'Nope', email: `x_${randomUUID()}@example.com`, roleId: editorRole.id, password: USER_PASSWORD });
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('rejects creating a user with a duplicate email', async () => {
+    const { agent, csrf } = await adminSession();
+    const roles = await agent.get('/api/roles');
+    const roleId = roles.body.data.find((r: { name: string }) => r.name === 'author').id;
+    const email = `dupe_${randomUUID()}@example.com`;
+    const first = await agent.post('/api/users').set('x-csrf-token', csrf).send({ name: 'Dupe One', email, roleId, password: USER_PASSWORD });
+    expect(first.status).toBe(201);
+    const second = await agent.post('/api/users').set('x-csrf-token', csrf).send({ name: 'Dupe Two', email, roleId, password: USER_PASSWORD });
+    expect(second.status).toBe(400);
+  });
+
+  it('soft-deletes (deactivates) a user and refuses self-delete', async () => {
+    const { agent, csrf } = await adminSession();
+    const roles = await agent.get('/api/roles');
+    const roleId = roles.body.data.find((r: { name: string }) => r.name === 'author').id;
+    const email = `del_${randomUUID()}@example.com`;
+    const created = await agent.post('/api/users').set('x-csrf-token', csrf).send({ name: 'Del Me', email, roleId, password: USER_PASSWORD });
+    expect(created.status).toBe(201);
+
+    const del = await agent.delete(`/api/users/${created.body.data.id}`).set('x-csrf-token', csrf);
+    expect(del.status).toBe(200);
+    expect(del.body.data.status).toBe('inactive'); // soft-delete = deactivate, not removal
+
+    // The row still exists (history preserved), just inactive.
+    const still = await agent.get(`/api/users/${created.body.data.id}`);
+    expect(still.status).toBe(200);
+    expect(still.body.data.status).toBe('inactive');
+
+    // Admin cannot delete their own account.
+    const me = await agent.get('/api/users?q=' + encodeURIComponent(ADMIN_EMAIL));
+    const selfId = me.body.data.find((u: { email: string }) => u.email === ADMIN_EMAIL).id;
+    const self = await agent.delete(`/api/users/${selfId}`).set('x-csrf-token', csrf);
+    expect(self.status).toBe(400);
+  });
+
   // ── Roles ──
   it('admin lists roles with permissions + user counts', async () => {
     const { agent } = await adminSession();
@@ -118,6 +176,44 @@ describe.skipIf(!RUN)('admin management integration (DB)', () => {
       .send({ description: 'Content management (updated by test)' });
     expect(res.status).toBe(200);
     expect(res.body.data.description).toContain('updated by test');
+  });
+
+  it('admin creates a role with permissions and edits its permission set', async () => {
+    const { agent, csrf } = await adminSession();
+    const name = `qa-role-${randomUUID().slice(0, 8)}`;
+    const created = await agent
+      .post('/api/roles')
+      .set('x-csrf-token', csrf)
+      .send({ name, description: 'QA role', permissions: ['products.view', 'guides.view'] });
+    expect(created.status).toBe(201);
+    expect(created.body.data.name).toBe(name);
+    expect(created.body.data.permissions.sort()).toEqual(['guides.view', 'products.view']);
+
+    // Replace the permission set.
+    const edited = await agent
+      .patch(`/api/roles/${created.body.data.id}`)
+      .set('x-csrf-token', csrf)
+      .send({ permissions: ['products.view', 'products.edit', 'brands.view'] });
+    expect(edited.status).toBe(200);
+    expect(edited.body.data.permissions.sort()).toEqual(['brands.view', 'products.edit', 'products.view']);
+  });
+
+  it('rejects an unknown permission and refuses editing the admin role permissions', async () => {
+    const { agent, csrf } = await adminSession();
+    const roles = await agent.get('/api/roles');
+    const adminRole = roles.body.data.find((r: { name: string }) => r.name === 'admin');
+
+    const bad = await agent
+      .post('/api/roles')
+      .set('x-csrf-token', csrf)
+      .send({ name: `bad-${randomUUID().slice(0, 6)}`, permissions: ['does.not.exist'] });
+    expect(bad.status).toBe(400);
+
+    const adminEdit = await agent
+      .patch(`/api/roles/${adminRole.id}`)
+      .set('x-csrf-token', csrf)
+      .send({ permissions: ['products.view'] });
+    expect(adminEdit.status).toBe(400);
   });
 
   // ── Settings ──

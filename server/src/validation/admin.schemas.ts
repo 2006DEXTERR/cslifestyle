@@ -17,6 +17,15 @@ export const userListQuerySchema = z.object({
 });
 export type UserListQuery = z.infer<typeof userListQuerySchema>;
 
+export const createUserSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(160),
+  email: z.string().trim().email('Invalid email').max(254),
+  roleId: z.string().trim().min(1, 'A role is required').max(60),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  isActive: z.boolean().optional(),
+});
+export type CreateUserBody = z.infer<typeof createUserSchema>;
+
 export const updateUserSchema = z
   .object({
     name: z.string().trim().min(2, 'Name must be at least 2 characters').max(160),
@@ -34,9 +43,24 @@ export type UpdateUserStatusBody = z.infer<typeof updateUserStatusSchema>;
 
 // ───────────────────────── Roles ─────────────────────────
 
+const permissionNames = z.array(z.string().trim().min(1).max(80)).max(400);
+
+export const createRoleSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Role name must be at least 2 characters')
+    .max(60)
+    .regex(/^[a-z][a-z0-9_-]*$/, 'Use lowercase letters, numbers, hyphens or underscores'),
+  description: z.string().trim().max(300).optional(),
+  permissions: permissionNames.optional(),
+});
+export type CreateRoleBody = z.infer<typeof createRoleSchema>;
+
 export const updateRoleSchema = z
   .object({
     description: z.string().trim().max(300),
+    permissions: permissionNames,
   })
   .partial()
   .refine((b) => Object.keys(b).length > 0, { message: 'No fields to update' });

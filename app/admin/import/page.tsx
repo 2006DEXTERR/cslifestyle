@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/format';
 import {
   importApi,
+  ImportApiError,
   type DuplicateMode,
   type ImportJob,
   type ImportStats,
@@ -30,11 +31,24 @@ import {
 } from '@/lib/api/import';
 
 const importTypes = [
-  { id: 'asin', name: 'ASIN Import', icon: Link2, description: 'Import from Amazon ASIN', color: 'bg-orange-500' },
-  { id: 'csv', name: 'CSV Import', icon: FileText, description: 'Bulk import from CSV file', color: 'bg-blue-500' },
-  { id: 'url', name: 'URL Import', icon: Link2, description: 'Import from product URL', color: 'bg-green-500' },
-  { id: 'category', name: 'Category Import', icon: FolderTree, description: 'Import from browse nodes', color: 'bg-purple-500' },
+  { id: 'asin', name: 'ASIN Import', icon: Link2, description: 'Import from Amazon ASIN', color: 'bg-orange-500', available: true },
+  { id: 'csv', name: 'CSV Import', icon: FileText, description: 'Bulk import from CSV file', color: 'bg-blue-500', available: true },
+  { id: 'url', name: 'URL Import', icon: Link2, description: 'Not available yet', color: 'bg-green-500', available: false },
+  { id: 'category', name: 'Category Import', icon: FolderTree, description: 'Import from browse nodes', color: 'bg-purple-500', available: true },
 ] as const;
+
+/**
+ * Turn an import API error into a clear, actionable message. Auth/permission
+ * failures otherwise surface the backend's terse "Authentication required".
+ */
+function friendlyError(err: unknown): string {
+  if (err instanceof ImportApiError) {
+    if (err.status === 401) return 'Your admin session has expired. Please sign in again to import.';
+    if (err.status === 403) return 'You don’t have permission to import. This needs the import.create (or import.manage) permission — ask an admin to grant it.';
+    return err.message; // e.g. the clear PA-API "credentials are not configured" message
+  }
+  return err instanceof Error ? err.message : 'Something went wrong.';
+}
 
 const duplicateModes: { id: DuplicateMode; label: string; hint: string }[] = [
   { id: 'skip', label: 'Skip', hint: 'Leave existing records untouched' },
@@ -88,7 +102,7 @@ export default function ImportCenterPage() {
       setJobs(j.items);
       setLoadError(null);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load import data');
+      setLoadError(friendlyError(err));
     }
   }, []);
 
@@ -119,7 +133,7 @@ export default function ImportCenterPage() {
     } catch (err) {
       // Surfaces the clear backend message (e.g. "Amazon PA-API credentials are not configured.")
       setApiState('failed');
-      setApiMessage(err instanceof Error ? err.message : 'API import failed');
+      setApiMessage(friendlyError(err));
       void checkApiConfig();
     }
   }, [refresh, checkApiConfig]);
@@ -210,7 +224,7 @@ export default function ImportCenterPage() {
       setWizardStep(3);
       await refresh();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Import failed');
+      setSubmitError(friendlyError(err));
     } finally {
       setSubmitting(false);
     }
@@ -325,18 +339,30 @@ export default function ImportCenterPage() {
               {importTypes.map((type) => (
                 <button
                   key={type.id}
+                  disabled={!type.available}
                   onClick={() => {
+                    if (!type.available) return;
                     resetWizard();
                     setSelectedType(type.id);
                     setShowImportWizard(true);
                     setWizardStep(1);
                   }}
-                  className="group rounded-xl border border-border bg-card p-6 text-left hover:border-brand-pink hover:shadow-md transition-all"
+                  className={cn(
+                    'group relative rounded-xl border border-border bg-card p-6 text-left transition-all',
+                    type.available
+                      ? 'hover:border-brand-pink hover:shadow-md'
+                      : 'opacity-60 cursor-not-allowed',
+                  )}
                 >
-                  <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center mb-4', type.color)}>
+                  {!type.available && (
+                    <span className="absolute top-3 right-3 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      Coming soon
+                    </span>
+                  )}
+                  <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center mb-4', type.color, !type.available && 'grayscale')}>
                     <type.icon className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="font-semibold text-foreground group-hover:text-brand-pink transition-colors">
+                  <h3 className={cn('font-semibold text-foreground transition-colors', type.available && 'group-hover:text-brand-pink')}>
                     {type.name}
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">{type.description}</p>
@@ -623,14 +649,22 @@ export default function ImportCenterPage() {
                     {importTypes.map((type) => (
                       <button
                         key={type.id}
-                        onClick={() => setSelectedType(type.id)}
+                        disabled={!type.available}
+                        onClick={() => { if (type.available) setSelectedType(type.id); }}
                         className={cn(
-                          'p-4 rounded-xl border text-left transition-all',
-                          selectedType === type.id
-                            ? 'border-brand-pink bg-brand-pink/5'
-                            : 'border-border hover:border-brand-pink/50'
+                          'relative p-4 rounded-xl border text-left transition-all',
+                          !type.available
+                            ? 'border-border opacity-60 cursor-not-allowed'
+                            : selectedType === type.id
+                              ? 'border-brand-pink bg-brand-pink/5'
+                              : 'border-border hover:border-brand-pink/50'
                         )}
                       >
+                        {!type.available && (
+                          <span className="absolute top-2 right-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            Soon
+                          </span>
+                        )}
                         <p className="font-medium">{type.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">{type.description}</p>
                       </button>

@@ -80,13 +80,24 @@ export interface AiStats {
   totalProviders: number;
 }
 
+/**
+ * Provider status (shared meaning with the backend):
+ *   active         → actually serving requests now (live + key configured + selected)
+ *   configured     → key present but not the selected/used provider (or mock mode is on)
+ *   not_configured → required API key env var missing
+ *   mock           → built-in mock driver, active because AI_DRIVER=mock
+ */
+export type AiProviderStatus = 'active' | 'configured' | 'not_configured' | 'mock';
+
 export interface AiProvider {
   id: string;
   name: string;
-  status: 'active' | 'inactive';
+  status: AiProviderStatus;
   primary: boolean;
   models: string[];
   driver: string;
+  /** Env var name(s) required for this provider to become active (empty for mock). */
+  requiredEnv: string[];
   usage: { tokens: number; cost: number };
   lastUsed: string | null;
 }

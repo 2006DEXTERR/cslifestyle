@@ -12,9 +12,19 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
   res.json(ok(items, { pagination }));
 }
 
+export async function createUser(req: Request, res: Response): Promise<void> {
+  const user = await svc.createUser(req.body);
+  res.status(201).json(ok(user, null, 'User created'));
+}
+
 export async function getUser(req: Request, res: Response): Promise<void> {
   const user = await svc.getUser(req.params.id);
   res.json(ok(user));
+}
+
+export async function deleteUser(req: Request, res: Response): Promise<void> {
+  const user = await svc.deleteUser(req.params.id, req.user?.id ?? null);
+  res.json(ok(user, null, 'User deactivated'));
 }
 
 export async function updateUser(req: Request, res: Response): Promise<void> {
@@ -32,6 +42,11 @@ export async function updateUserStatus(req: Request, res: Response): Promise<voi
 export async function listRoles(_req: Request, res: Response): Promise<void> {
   const roles = await svc.listRoles();
   res.json(ok(roles));
+}
+
+export async function createRole(req: Request, res: Response): Promise<void> {
+  const role = await svc.createRole(req.body);
+  res.status(201).json(ok(role, null, 'Role created'));
 }
 
 export async function getRole(req: Request, res: Response): Promise<void> {

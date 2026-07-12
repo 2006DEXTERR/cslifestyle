@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { adminApi, type AdminUser, type AdminRole } from '@/lib/api/admin';
+import { adminApi, AdminApiError, type AdminUser, type AdminRole } from '@/lib/api/admin';
 
 function formatLastLogin(value: string | null): string {
   if (!value) return 'Never';
@@ -32,14 +32,16 @@ export default function UsersAdminPage() {
 
   const [users, setUsers] = React.useState<AdminUser[]>([]);
   const [roleList, setRoleList] = React.useState<AdminRole[]>([]);
-  const [form, setForm] = React.useState({ name: '', email: '', roleId: '', status: 'active' });
+  const [form, setForm] = React.useState({ name: '', email: '', roleId: '', status: 'active', password: '' });
   const [saving, setSaving] = React.useState(false);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [formError, setFormError] = React.useState<string | null>(null);
 
   const loadUsers = React.useCallback(() => {
     adminApi
       .listUsers({ perPage: 100 })
-      .then((r) => setUsers(r.items))
-      .catch(() => undefined);
+      .then((r) => { setUsers(r.items); setLoadError(null); })
+      .catch(() => setLoadError('Could not load users. Check your connection or permissions and retry.'));
   }, []);
 
   React.useEffect(() => {
@@ -49,11 +51,13 @@ export default function UsersAdminPage() {
 
   React.useEffect(() => {
     if (!isEditorOpen) return;
+    setFormError(null);
     setForm({
       name: editingUser?.name ?? '',
       email: editingUser?.email ?? '',
       roleId: editingUser?.roleId ?? roleList[0]?.id ?? '',
       status: editingUser?.status ?? 'active',
+      password: '',
     });
   }, [isEditorOpen, editingUser, roleList]);
 
@@ -68,25 +72,40 @@ export default function UsersAdminPage() {
   const roles = roleList.map((r) => r.name);
 
   async function handleSave() {
-    if (!editingUser) {
-      setIsEditorOpen(false);
-      return;
-    }
+    setFormError(null);
+    if (!form.name.trim()) return setFormError('Name is required.');
+    if (!form.email.trim()) return setFormError('Email is required.');
+    if (!form.roleId) return setFormError('Please select a role.');
+
     setSaving(true);
     try {
-      await adminApi.updateUser(editingUser.id, {
-        name: form.name,
-        email: form.email,
-        roleId: form.roleId,
-      });
-      const nextActive = form.status === 'active';
-      if (nextActive !== (editingUser.status === 'active')) {
-        await adminApi.setUserStatus(editingUser.id, nextActive);
+      if (editingUser) {
+        await adminApi.updateUser(editingUser.id, {
+          name: form.name,
+          email: form.email,
+          roleId: form.roleId,
+        });
+        const nextActive = form.status === 'active';
+        if (nextActive !== (editingUser.status === 'active')) {
+          await adminApi.setUserStatus(editingUser.id, nextActive);
+        }
+      } else {
+        if (form.password.length < 8) {
+          setSaving(false);
+          return setFormError('A password of at least 8 characters is required for a new user.');
+        }
+        await adminApi.createUser({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          roleId: form.roleId,
+          password: form.password,
+          isActive: form.status === 'active',
+        });
       }
       loadUsers();
       setIsEditorOpen(false);
-    } catch {
-      // keep the drawer open on failure
+    } catch (err) {
+      setFormError(err instanceof AdminApiError ? err.message : 'Failed to save user.');
     } finally {
       setSaving(false);
     }
@@ -98,6 +117,22 @@ export default function UsersAdminPage() {
       loadUsers();
     } catch {
       // ignore
+    }
+  }
+
+  async function handleDelete(user: AdminUser) {
+    if (
+      !window.confirm(
+        `Deactivate ${user.name}? This revokes their access and signs them out. Their content and audit history are preserved and the account can be re-activated later.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await adminApi.deleteUser(user.id);
+      loadUsers();
+    } catch (err) {
+      window.alert(err instanceof AdminApiError ? err.message : 'Failed to deactivate user.');
     }
   }
 
@@ -120,6 +155,10 @@ export default function UsersAdminPage() {
           Add User
         </Button>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600">{loadError}</div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-4">
@@ -213,7 +252,7 @@ export default function UsersAdminPage() {
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(user)} title="Deactivate user">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -289,19 +328,28 @@ export default function UsersAdminPage() {
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Password</label>
-                  <Input type="password" placeholder="Enter new password" />
-                  <p className="text-xs text-muted-foreground">Leave empty to keep current password</p>
-                </div>
+                {!editingUser && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Password</label>
+                    <Input
+                      type="password"
+                      placeholder="At least 8 characters"
+                      value={form.password}
+                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">The user can change this later from their account.</p>
+                  </div>
+                )}
+
+                {formError && <p className="text-sm text-red-600">{formError}</p>}
               </div>
 
               <div className="sticky bottom-0 flex items-center justify-end gap-3 p-4 border-t bg-background">
-                <Button variant="outline" onClick={() => setIsEditorOpen(false)}>
+                <Button variant="outline" onClick={() => setIsEditorOpen(false)} disabled={saving}>
                   Cancel
                 </Button>
                 <Button className="bg-brand-gradient" onClick={handleSave} disabled={saving}>
-                  Save User
+                  {saving ? 'Saving…' : editingUser ? 'Save User' : 'Create User'}
                 </Button>
               </div>
             </motion.div>

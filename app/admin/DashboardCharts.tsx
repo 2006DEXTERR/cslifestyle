@@ -148,23 +148,37 @@ export default function DashboardCharts({
             <h2 className="text-lg font-semibold">Category Distribution</h2>
             <p className="text-sm text-muted-foreground">Published products by category</p>
           </div>
-          <div className="h-[200px]">
-            {categoryDistributionData.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No products yet</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={categoryDistributionData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
-                    {categoryDistributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+          {categoryDistributionData.length === 0 ? (
+            <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No products yet</div>
+          ) : (
+            <>
+              {/* Donut only — the recharts <Legend> crowds this narrow card and
+                  overlaps the chart, so category labels live in the list below. */}
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={categoryDistributionData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
+                      {categoryDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="mt-4 space-y-1.5 max-h-[120px] overflow-auto">
+                {categoryDistributionData.map((entry) => (
+                  <li key={entry.name} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                      <span className="truncate" title={entry.name}>{entry.name}</span>
+                    </span>
+                    <span className="text-muted-foreground tabular-nums shrink-0">{entry.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </motion.div>
 
         {/* Quick Actions */}

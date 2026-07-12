@@ -124,11 +124,22 @@ describe.skipIf(!RUN)('AI center integration (DB)', () => {
     const stats = await agent.get('/api/ai/stats');
     expect(stats.body.data).toHaveProperty('costThisMonth');
     expect(stats.body.data.totalProviders).toBe(4);
-    expect(stats.body.data.activeProviders).toBeGreaterThanOrEqual(1);
+    // Mock mode (test env, no keys): only the mock driver is usable → exactly 1 active.
+    expect(stats.body.data.activeProviders).toBe(1);
 
     const providers = await agent.get('/api/ai/providers');
-    expect(providers.body.data).toHaveLength(4);
-    expect((providers.body.data as { id: string; primary: boolean }[]).find((p) => p.id === 'anthropic')?.primary).toBe(true);
+    const rows = providers.body.data as { id: string; primary: boolean; status: string; requiredEnv: string[] }[];
+    expect(rows).toHaveLength(4);
+    expect(rows.find((p) => p.id === 'anthropic')?.primary).toBe(true);
+    // In mock mode with no API keys, real providers must NOT be "active".
+    const mock = rows.find((p) => p.id === 'mock');
+    expect(mock?.status).toBe('mock');
+    for (const id of ['anthropic', 'openai', 'gemini']) {
+      const p = rows.find((r) => r.id === id);
+      expect(p?.status).toBe('not_configured');
+      expect(p?.status).not.toBe('active');
+      expect(p?.requiredEnv.length).toBeGreaterThan(0); // env var NAME exposed, no secret value
+    }
 
     const bulk = await agent.post('/api/ai/bulk-generate').set('x-csrf-token', csrf).send({ entityType: 'product', limit: 2 });
     expect(bulk.status).toBe(201);

@@ -96,6 +96,23 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+  const [notifOpen, setNotifOpen] = React.useState(false);
+  const notifRef = React.useRef<HTMLDivElement>(null);
+
+  // Close the notifications panel on outside click / Escape.
+  React.useEffect(() => {
+    if (!notifOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNotifOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [notifOpen]);
 
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -268,10 +285,31 @@ export default function AdminLayout({
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
-              </Button>
+              <div className="relative" ref={notifRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setNotifOpen((v) => !v)}
+                  aria-label="Notifications"
+                  aria-expanded={notifOpen}
+                >
+                  <Bell className="w-5 h-5" />
+                </Button>
+                {notifOpen && (
+                  <div className="absolute right-0 mt-2 w-72 rounded-xl border bg-card shadow-lg z-50">
+                    <div className="px-4 py-3 border-b">
+                      <p className="text-sm font-semibold">Notifications</p>
+                    </div>
+                    <div className="p-6 text-center">
+                      <Bell className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">No notifications yet.</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Notification alerts aren’t configured yet.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
               <Button variant="ghost" size="icon" onClick={toggleTheme}>
                 {theme === 'light' ? (
                   <Moon className="w-5 h-5" />

@@ -60,12 +60,13 @@ export default function SettingsAdminPage() {
   const [values, setValues] = React.useState<Record<string, string>>(DEFAULTS);
   const [saving, setSaving] = React.useState(false);
   const [savedAt, setSavedAt] = React.useState(false);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
     adminApi
       .getSettings()
-      .then(({ values: v }) => setValues((prev) => ({ ...prev, ...v })))
-      .catch(() => undefined);
+      .then(({ values: v }) => { setValues((prev) => ({ ...prev, ...v })); setLoadError(null); })
+      .catch(() => setLoadError('Could not load saved settings — the values below are defaults until settings load and save successfully.'));
   }, []);
 
   React.useEffect(() => {
@@ -100,6 +101,10 @@ export default function SettingsAdminPage() {
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Configure your application settings</p>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600">{loadError}</div>
+      )}
 
       <div className="grid lg:grid-cols-[250px_1fr] gap-6">
         {/* Sidebar */}
@@ -175,12 +180,12 @@ export default function SettingsAdminPage() {
                         <p className="text-2xl font-bold">CS</p>
                       </div>
                       <div>
-                        <Button variant="outline">
+                        <Button variant="outline" disabled title="Media uploads are not available yet">
                           <Upload className="w-4 h-4 mr-2" />
                           Upload Logo
                         </Button>
                         <p className="text-xs text-muted-foreground mt-2">
-                          Recommended: 200px x 200px, PNG or SVG
+                          Logo uploads aren’t available yet — coming with the media library.
                         </p>
                       </div>
                     </div>
@@ -209,9 +214,12 @@ export default function SettingsAdminPage() {
                       <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
                         <p className="text-lg font-bold">C</p>
                       </div>
-                      <Button variant="outline" size="sm">
-                        Upload
-                      </Button>
+                      <div>
+                        <Button variant="outline" size="sm" disabled title="Media uploads are not available yet">
+                          Upload
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-2">Coming with the media library.</p>
+                      </div>
                     </div>
                   </div>
                 </div>

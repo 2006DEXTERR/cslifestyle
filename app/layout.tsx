@@ -2,9 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/theme-provider';
-import { Navbar } from '@/components/layout/Navbar';
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
-import { Footer } from '@/components/layout/Footer';
+import { SiteChrome } from '@/components/layout/SiteChrome';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { SITE, organizationJsonLd, websiteJsonLd } from '@/lib/seo';
 
@@ -54,12 +52,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="relative min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1 pb-20 md:pb-0">{children}</main>
-            <Footer />
-            <MobileBottomNav />
-          </div>
+          <SiteChrome>{children}</SiteChrome>
         </ThemeProvider>
       </body>
     </html>

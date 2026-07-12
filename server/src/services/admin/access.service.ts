@@ -2,7 +2,15 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { ApiError } from '../../lib/http';
 import type { Pagination } from '../../lib/http';
-import type { UserListQuery, UpdateUserBody, UpdateRoleBody } from '../../validation/admin.schemas';
+import { hashPassword } from '../../lib/password';
+import { ALL_PERMISSION_NAMES, ROLES } from '../../config/permissions';
+import type {
+  UserListQuery,
+  CreateUserBody,
+  UpdateUserBody,
+  CreateRoleBody,
+  UpdateRoleBody,
+} from '../../validation/admin.schemas';
 
 /**
  * Admin access-management service (Phase 13): users + roles + permissions.
@@ -106,6 +114,54 @@ export async function listUsers(
   };
 }
 
+export async function createUser(body: CreateUserBody): Promise<PresentedUser> {
+  const role = await prisma.role.findUnique({ where: { id: body.roleId }, select: { id: true } });
+  if (!role) throw ApiError.badRequest('Unknown role', { roleId: ['Unknown role'] });
+
+  const clash = await prisma.user.findUnique({ where: { email: body.email }, select: { id: true } });
+  if (clash) throw ApiError.badRequest('Email already in use', { email: ['Email already in use'] });
+
+  const passwordHash = await hashPassword(body.password);
+  const u = await prisma.user.create({
+    data: {
+      name: body.name,
+      email: body.email,
+      passwordHash,
+      roleId: body.roleId,
+      isActive: body.isActive ?? true,
+      emailVerified: true, // admin-created accounts are pre-verified (the admin vouches for them)
+    },
+    include: { role: true },
+  });
+  return presentUser(u, null);
+}
+
+/**
+ * Soft-delete a user: deactivate + revoke every session/refresh token (immediate
+ * sign-out). We do NOT hard-delete because the User row is referenced by audit
+ * logs (attribution), import jobs, campaigns, media, revenue imports and more —
+ * a hard delete would either fail on those constraints or destroy history.
+ * Deactivation is reversible and preserves the audit trail. Guards: cannot remove
+ * your own access, and cannot deactivate the last remaining active admin.
+ */
+export async function deleteUser(id: string, actingUserId: string | null): Promise<PresentedUser> {
+  const target = await prisma.user.findUnique({ where: { id }, include: { role: true } });
+  if (!target) throw ApiError.notFound('User not found');
+  if (actingUserId && actingUserId === id) throw ApiError.badRequest('You cannot delete your own account');
+
+  if (target.role.name === ROLES.ADMIN && target.isActive) {
+    const activeAdmins = await prisma.user.count({ where: { isActive: true, role: { name: ROLES.ADMIN } } });
+    if (activeAdmins <= 1) throw ApiError.badRequest('Cannot deactivate the last active admin');
+  }
+
+  const [u] = await prisma.$transaction([
+    prisma.user.update({ where: { id }, data: { isActive: false }, include: { role: true } }),
+    prisma.session.deleteMany({ where: { userId: id } }),
+    prisma.refreshToken.deleteMany({ where: { userId: id } }),
+  ]);
+  return presentUser(u, null);
+}
+
 export async function getUser(id: string): Promise<PresentedUser> {
   const u = await prisma.user.findUnique({ where: { id }, include: { role: true } });
   if (!u) throw ApiError.notFound('User not found');
@@ -181,11 +237,59 @@ export async function getRole(id: string): Promise<PresentedRole> {
   return presentRole(r);
 }
 
+/** Validate permission names against the canonical catalog and resolve them to ids. */
+async function resolvePermissionIds(names: string[]): Promise<string[]> {
+  const unique = [...new Set(names)];
+  const invalid = unique.filter((n) => !ALL_PERMISSION_NAMES.includes(n));
+  if (invalid.length) {
+    throw ApiError.badRequest('Unknown permission(s)', {
+      permissions: invalid.map((n) => `Unknown permission: ${n}`),
+    });
+  }
+  if (unique.length === 0) return [];
+  const rows = await prisma.permission.findMany({ where: { name: { in: unique } }, select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+export async function createRole(body: CreateRoleBody): Promise<PresentedRole> {
+  const clash = await prisma.role.findUnique({ where: { name: body.name }, select: { id: true } });
+  if (clash) throw ApiError.badRequest('A role with that name already exists', { name: ['Name already in use'] });
+
+  const permissionIds = await resolvePermissionIds(body.permissions ?? []);
+  const role = await prisma.role.create({
+    data: {
+      name: body.name,
+      description: body.description ?? null,
+      permissions: { create: permissionIds.map((permissionId) => ({ permissionId })) },
+    },
+    include: ROLE_INCLUDE,
+  });
+  return presentRole(role);
+}
+
 export async function updateRole(id: string, body: UpdateRoleBody): Promise<PresentedRole> {
-  const existing = await prisma.role.findUnique({ where: { id }, select: { id: true } });
+  const existing = await prisma.role.findUnique({ where: { id }, select: { id: true, name: true } });
   if (!existing) throw ApiError.notFound('Role not found');
-  const data: Prisma.RoleUncheckedUpdateInput = {};
-  if (body.description !== undefined) data.description = body.description;
-  await prisma.role.update({ where: { id }, data });
+  // The admin role must retain full access — refuse permission edits so an admin
+  // can never lock the whole team out of the panel.
+  if (body.permissions !== undefined && existing.name === ROLES.ADMIN) {
+    throw ApiError.badRequest('The admin role always has full access and its permissions cannot be edited');
+  }
+
+  const permissionIds = body.permissions !== undefined ? await resolvePermissionIds(body.permissions) : null;
+
+  await prisma.$transaction(async (tx) => {
+    const data: Prisma.RoleUncheckedUpdateInput = {};
+    if (body.description !== undefined) data.description = body.description;
+    if (Object.keys(data).length) await tx.role.update({ where: { id }, data });
+    if (permissionIds !== null) {
+      await tx.rolePermission.deleteMany({ where: { roleId: id } });
+      if (permissionIds.length) {
+        await tx.rolePermission.createMany({
+          data: permissionIds.map((permissionId) => ({ roleId: id, permissionId })),
+        });
+      }
+    }
+  });
   return getRole(id);
 }

@@ -46,20 +46,29 @@ export default function AdminDashboard() {
   const [overview, setOverview] = React.useState<AdminOverview | null>(null);
   const [analytics, setAnalytics] = React.useState<DashboardData | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let active = true;
     (async () => {
       // Overview (entity counts) and analytics (traffic/clicks) are independent so a
       // missing analytics.view permission still renders the catalog counts.
-      const [ov, an] = await Promise.all([
-        adminApi.getOverview().catch(() => null),
-        analyticsApi.getDashboard('last30days').catch(() => null),
+      const [ov, an] = await Promise.allSettled([
+        adminApi.getOverview(),
+        analyticsApi.getDashboard('last30days'),
       ]);
       if (!active) return;
-      if (ov) setOverview(ov); else setError(true);
-      setAnalytics(an);
+      if (ov.status === 'fulfilled') {
+        setOverview(ov.value);
+        setError(null);
+      } else {
+        // Surface the real reason (HTTP status + message) so the failure is diagnosable
+        // — e.g. 401 (not signed in), 404 (proxy/route), or a network/backend-down error.
+        const e = ov.reason as { status?: number; message?: string };
+        const status = e?.status ? `${e.status} ` : '';
+        setError(`Couldn't load dashboard data (${status}${e?.message ?? 'network error'}). Check that the backend is running and reachable.`);
+      }
+      setAnalytics(an.status === 'fulfilled' ? an.value : null);
       setLoading(false);
     })();
     return () => { active = false; };
@@ -92,7 +101,7 @@ export default function AdminDashboard() {
         <p className="text-muted-foreground">
           Welcome back! Here&apos;s an overview of your platform.
           {loading && <span className="ml-2 text-xs">Loading live data…</span>}
-          {error && <span className="ml-2 text-xs text-red-600">Live data is temporarily unavailable.</span>}
+          {error && <span className="ml-2 text-xs text-red-600">{error}</span>}
         </p>
       </div>
 

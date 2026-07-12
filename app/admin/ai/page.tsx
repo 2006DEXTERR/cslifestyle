@@ -9,7 +9,15 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
 import { formatNumber, formatDate } from '@/lib/format';
-import { aiApi, type AiJob, type AiLogEntry, type AiStats, type AiProvider, type AiUsage, type AiPrompt } from '@/lib/api/ai';
+import { aiApi, type AiJob, type AiLogEntry, type AiStats, type AiProvider, type AiProviderStatus, type AiUsage, type AiPrompt } from '@/lib/api/ai';
+
+/** Provider status → badge label + colour (same meaning as the backend enum). */
+const PROVIDER_STATUS: Record<AiProviderStatus, { label: string; cls: string }> = {
+  active: { label: 'Active', cls: 'text-green-600 bg-green-50 dark:bg-green-950/30' },
+  configured: { label: 'Configured (not selected)', cls: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30' },
+  not_configured: { label: 'Not configured', cls: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30' },
+  mock: { label: 'Active (mock mode)', cls: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30' },
+};
 
 const PIE_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#94a3b8', '#E91E8F'];
 
@@ -370,7 +378,7 @@ export default function AICenterPage() {
                 <button onClick={() => setExpandedProvider(expandedProvider === provider.id ? null : provider.id)}
                   className="w-full p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className={cn('rounded-lg p-3', getStatusColor(provider.status))}><Brain className="h-6 w-6" /></div>
+                    <div className={cn('rounded-lg p-3', PROVIDER_STATUS[provider.status].cls)}><Brain className="h-6 w-6" /></div>
                     <div className="text-left">
                       <h3 className="font-semibold text-foreground">{provider.name}{provider.primary && <span className="ml-2 rounded-full bg-brand-pink/10 px-2 py-0.5 text-xs font-medium text-brand-pink">primary</span>}</h3>
                       <p className="text-sm text-muted-foreground">{provider.models.length} models • Last used: {provider.lastUsed ? formatDate(provider.lastUsed) : 'Never'}</p>
@@ -381,7 +389,9 @@ export default function AICenterPage() {
                       <p className="text-sm font-medium text-foreground">${provider.usage.cost.toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">this month</p>
                     </div>
-                    <span className={cn('rounded-full px-3 py-1 text-xs font-medium capitalize', getStatusColor(provider.status))}>{provider.status}</span>
+                    <span className={cn('rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap', PROVIDER_STATUS[provider.status].cls)}>
+                      {PROVIDER_STATUS[provider.status].label}
+                    </span>
                     <ChevronDown className={cn('h-5 w-5 text-muted-foreground transition-transform', expandedProvider === provider.id && 'rotate-180')} />
                   </div>
                 </button>
@@ -399,6 +409,37 @@ export default function AICenterPage() {
                             <p className="text-xl font-bold text-foreground">{provider.models.join(', ')}</p>
                           </div>
                         </div>
+
+                        {/* Configuration help — env var NAMES only, never secret values. */}
+                        {provider.status === 'not_configured' && provider.requiredEnv.length > 0 && (
+                          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm">
+                            <p className="font-medium text-yellow-700 dark:text-yellow-400">
+                              Not configured — set to activate {provider.name}:
+                            </p>
+                            <ul className="mt-2 ml-5 list-disc text-muted-foreground">
+                              {provider.requiredEnv.map((v) => (
+                                <li key={v}><code>{v}</code></li>
+                              ))}
+                            </ul>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Also set <code>AI_DRIVER=live</code> and, to make this the default, <code>AI_PRIMARY_PROVIDER={provider.id}</code>. Restart the API after changing env vars.
+                            </p>
+                          </div>
+                        )}
+                        {provider.status === 'configured' && (
+                          <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4 text-sm">
+                            <p className="font-medium text-blue-700 dark:text-blue-400">Configured but not the active provider.</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Its API key (<code>{provider.requiredEnv.join(', ')}</code>) is set, but requests are currently served by the mock driver or another provider.
+                              Set <code>AI_DRIVER=live</code> and <code>AI_PRIMARY_PROVIDER={provider.id}</code> to select it, then restart the API.
+                            </p>
+                          </div>
+                        )}
+                        {provider.status === 'mock' && (
+                          <div className="rounded-lg border border-border bg-background p-4 text-xs text-muted-foreground">
+                            Local mock driver is active (<code>AI_DRIVER=mock</code>) — it generates placeholder content without any external API key. Switch to a real provider by setting <code>AI_DRIVER=live</code> and that provider’s API key.
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   )}

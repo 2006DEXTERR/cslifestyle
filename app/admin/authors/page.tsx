@@ -23,6 +23,17 @@ export default function AuthorsAdminPage() {
     void refresh().catch(() => setAuthors([]));
   }, [refresh]);
 
+  // Open the profile drawer with the list row immediately, then upgrade it with the
+  // full author record (getAuthor populates `guides`, which the list endpoint omits)
+  // so the "Published" count reflects live data instead of always showing 0.
+  const openAuthor = React.useCallback((author: ContentAuthor) => {
+    setSelectedAuthor(author);
+    contentApi
+      .getAuthor(author.slug)
+      .then((full) => setSelectedAuthor((cur) => (cur && cur.id === full.id ? full : cur)))
+      .catch(() => undefined);
+  }, []);
+
   const handleDelete = async (author: ContentAuthor) => {
     if (!window.confirm(`Delete author "${author.name}"? Their guides are kept but unlinked.`)) return;
     try {
@@ -121,7 +132,7 @@ export default function AuthorsAdminPage() {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setSelectedAuthor(author)}>
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => openAuthor(author)}>
                 View Profile
               </Button>
               <Button

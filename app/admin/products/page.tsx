@@ -35,7 +35,7 @@ import {
   type CatalogBrand,
 } from '@/lib/api/catalog';
 import { formatNumber, formatDate } from '@/lib/format';
-import { productImageClass } from '@/lib/image';
+import { productThumbClass } from '@/lib/image';
 
 interface ProductRow {
   id: string;
@@ -145,7 +145,7 @@ export default function ProductsAdminPage() {
         header: '',
         cell: ({ row }) => (
           <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted">
-            <img src={row.original.image} alt={row.original.name} className={productImageClass} />
+            <img src={row.original.image} alt={row.original.name} className={productThumbClass} />
           </div>
         ),
         enableSorting: false,
@@ -548,6 +548,12 @@ function ProductEditor({
     if (!form.title.trim()) return setError('Product name is required.');
     if (!form.categoryId) return setError('Please select a category.');
     if (!product && !form.asin.trim()) return setError('ASIN is required for a new product.');
+    // The backend requires a real product image on create — validate here so the
+    // admin is pointed at the Images tab instead of getting a round-trip error.
+    if (!product && !form.image.trim()) {
+      setActiveTab('images');
+      return setError('A product image URL is required. Add one on the Images tab.');
+    }
 
     let specifications: unknown;
     if (form.specifications.trim()) {

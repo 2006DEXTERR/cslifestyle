@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Send, Users, TrendingUp, Eye, MousePointer, Bell, Plus, Edit, Clock, CheckCircle2, Settings, Target, Trash2, AlertTriangle, Check } from 'lucide-react';
+import { Mail, Send, Users, TrendingUp, Eye, MousePointer, Plus, Edit, Clock, CheckCircle2, Settings, Target, Trash2, AlertTriangle, Check } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, ComposedChart } from 'recharts';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
@@ -20,7 +20,7 @@ const getStatusColor = (status: string) => {
 };
 
 export default function MarketingPage() {
-  const [activeTab, setActiveTab] = useState<'newsletter' | 'campaigns' | 'push' | 'segments'>('newsletter');
+  const [activeTab, setActiveTab] = useState<'newsletter' | 'campaigns' | 'segments'>('newsletter');
   const [dashboard, setDashboard] = useState<MarketingDashboard | null>(null);
   const [subStats, setSubStats] = useState<SubscriberStats | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -141,7 +141,6 @@ export default function MarketingPage() {
           {[
             { id: 'newsletter', label: 'Newsletter', icon: Mail },
             { id: 'campaigns', label: 'Campaigns', icon: Send },
-            { id: 'push', label: 'Push Notifications', icon: Bell },
             { id: 'segments', label: 'Audience Segments', icon: Users },
           ].map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as typeof activeTab)}

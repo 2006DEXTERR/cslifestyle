@@ -2,6 +2,52 @@ import { describe, it, expect } from 'vitest';
 import { renderPrompt, JOB_TO_TEMPLATE, DEFAULT_PROMPTS, PROMPT_TEMPLATE_TYPES, isPromptTemplateType } from '../../src/services/ai/prompts';
 import { validateGeneration } from '../../src/services/ai/validation';
 import { generate, __test__ } from '../../src/services/ai/providers';
+import { resolveProviderStatuses } from '../../src/services/ai/ai.service';
+
+describe('AI provider status semantics (FR-053)', () => {
+  const NONE = { anthropic: false, openai: false, gemini: false };
+
+  it('mock mode: no real provider is active; the mock driver is active', () => {
+    const s = resolveProviderStatuses({ live: false, primary: 'anthropic', configured: NONE });
+    expect(s.anthropic).toBe('not_configured');
+    expect(s.openai).toBe('not_configured');
+    expect(s.gemini).toBe('not_configured');
+    expect(s.mock).toBe('mock');
+    // Critically: Anthropic must NOT read "active" just because it is the primary in mock mode.
+    expect(s.anthropic).not.toBe('active');
+  });
+
+  it('mock mode with a key present: real provider is "configured", still not active', () => {
+    const s = resolveProviderStatuses({ live: false, primary: 'anthropic', configured: { ...NONE, anthropic: true } });
+    expect(s.anthropic).toBe('configured'); // key set but mock mode → not in use
+    expect(s.mock).toBe('mock');
+    expect(s.anthropic).not.toBe('active');
+  });
+
+  it('live mode, no keys configured: nothing is active (mock is off too)', () => {
+    const s = resolveProviderStatuses({ live: true, primary: 'anthropic', configured: NONE });
+    expect(s.anthropic).toBe('not_configured');
+    expect(s.openai).toBe('not_configured');
+    expect(s.gemini).toBe('not_configured');
+    expect(s.mock).toBe('not_configured');
+    expect(Object.values(s)).not.toContain('active');
+  });
+
+  it('live mode with the primary key configured: only the primary is active', () => {
+    const s = resolveProviderStatuses({ live: true, primary: 'openai', configured: { ...NONE, openai: true } });
+    expect(s.openai).toBe('active');
+    expect(s.anthropic).toBe('not_configured');
+    expect(s.mock).toBe('not_configured');
+  });
+
+  it('live mode: only the first usable provider in order is active, others configured are "not selected"', () => {
+    // primary=anthropic has no key; openai does → openai becomes the active one, gemini stays configured.
+    const s = resolveProviderStatuses({ live: true, primary: 'anthropic', configured: { anthropic: false, openai: true, gemini: true } });
+    expect(s.anthropic).toBe('not_configured');
+    expect(s.openai).toBe('active');
+    expect(s.gemini).toBe('configured');
+  });
+});
 
 describe('prompt templates + rendering (FR-054)', () => {
   it('renders {{placeholders}} and blanks missing vars', () => {

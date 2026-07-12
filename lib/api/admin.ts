@@ -129,15 +129,20 @@ export const adminApi = {
     };
   },
   getUser: (id: string) => request<AdminUser>(`/users/${id}`, { method: 'GET' }),
+  createUser: (body: { name: string; email: string; roleId: string; password: string; isActive?: boolean }) =>
+    request<AdminUser>('/users', { method: 'POST', body: JSON.stringify(body) }),
   updateUser: (id: string, body: { name?: string; email?: string; roleId?: string }) =>
     request<AdminUser>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   setUserStatus: (id: string, isActive: boolean) =>
     request<AdminUser>(`/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+  deleteUser: (id: string) => request<AdminUser>(`/users/${id}`, { method: 'DELETE' }),
 
-  // ── Roles (roles.view / roles.edit) ──
+  // ── Roles (roles.view / roles.create / roles.edit) ──
   listRoles: () => request<AdminRole[]>('/roles', { method: 'GET' }),
   getRole: (id: string) => request<AdminRole>(`/roles/${id}`, { method: 'GET' }),
-  updateRole: (id: string, body: { description?: string }) =>
+  createRole: (body: { name: string; description?: string; permissions?: string[] }) =>
+    request<AdminRole>('/roles', { method: 'POST', body: JSON.stringify(body) }),
+  updateRole: (id: string, body: { description?: string; permissions?: string[] }) =>
     request<AdminRole>(`/roles/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   // ── Settings (settings.view / settings.edit) ──
