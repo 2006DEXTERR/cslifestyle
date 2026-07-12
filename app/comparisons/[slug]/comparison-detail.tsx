@@ -120,7 +120,7 @@ export function ComparisonDetail({
                   Winner
                 </div>
               )}
-              <div className="aspect-video overflow-hidden bg-muted">
+              <div className="aspect-[4/3] overflow-hidden bg-muted">
                 <img
                   src={comparison.productA.image}
                   alt={comparison.productA.name}
@@ -130,13 +130,17 @@ export function ComparisonDetail({
               <div className="p-6">
                 <p className="text-sm text-muted-foreground mb-1">{comparison.productA.brand}</p>
                 <h2 className="text-xl font-bold mb-3">{comparison.productA.name}</h2>
-                <div className="flex items-center gap-2 mb-3">
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">{comparison.productA.rating}</span>
-                  <span className="text-sm text-muted-foreground">
-                    ({formatNumber(comparison.productA.reviewCount)} reviews)
-                  </span>
-                </div>
+                {comparison.productA.rating > 0 ? (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    <span className="font-semibold">{comparison.productA.rating}</span>
+                    <span className="text-sm text-muted-foreground">
+                      ({formatNumber(comparison.productA.reviewCount)} reviews)
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-3">No ratings yet</p>
+                )}
                 {typeof comparison.comparisonScoreA === 'number' && (
                   <p className="text-sm mb-4">
                     <span className="font-semibold text-green-600">{comparison.comparisonScoreA}</span>
@@ -148,7 +152,7 @@ export function ComparisonDetail({
                 </p>
                 <a href={`/go/${comparison.productA.asin}?src=comparison`} target="_blank" rel="noopener noreferrer nofollow sponsored">
                   <Button className="w-full bg-brand-gradient hover:opacity-90">
-                    Check Price on Amazon
+                    Buy Now on Amazon
                     <ExternalLink className="w-4 h-4 ml-2" />
                   </Button>
                 </a>
@@ -185,7 +189,7 @@ export function ComparisonDetail({
                   Winner
                 </div>
               )}
-              <div className="aspect-video overflow-hidden bg-muted">
+              <div className="aspect-[4/3] overflow-hidden bg-muted">
                 <img
                   src={comparison.productB.image}
                   alt={comparison.productB.name}
@@ -195,13 +199,17 @@ export function ComparisonDetail({
               <div className="p-6">
                 <p className="text-sm text-muted-foreground mb-1">{comparison.productB.brand}</p>
                 <h2 className="text-xl font-bold mb-3">{comparison.productB.name}</h2>
-                <div className="flex items-center gap-2 mb-3">
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">{comparison.productB.rating}</span>
-                  <span className="text-sm text-muted-foreground">
-                    ({formatNumber(comparison.productB.reviewCount)} reviews)
-                  </span>
-                </div>
+                {comparison.productB.rating > 0 ? (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    <span className="font-semibold">{comparison.productB.rating}</span>
+                    <span className="text-sm text-muted-foreground">
+                      ({formatNumber(comparison.productB.reviewCount)} reviews)
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-3">No ratings yet</p>
+                )}
                 {typeof comparison.comparisonScoreB === 'number' && (
                   <p className="text-sm mb-4">
                     <span className="font-semibold text-green-600">{comparison.comparisonScoreB}</span>
@@ -213,7 +221,7 @@ export function ComparisonDetail({
                 </p>
                 <a href={`/go/${comparison.productB.asin}?src=comparison`} target="_blank" rel="noopener noreferrer nofollow sponsored">
                   <Button className="w-full bg-brand-gradient hover:opacity-90">
-                    Check Price on Amazon
+                    Buy Now on Amazon
                     <ExternalLink className="w-4 h-4 ml-2" />
                   </Button>
                 </a>

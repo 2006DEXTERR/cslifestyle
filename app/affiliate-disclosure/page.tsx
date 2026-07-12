@@ -148,7 +148,7 @@ export default function AffiliateDisclosurePage() {
               <ul className="list-disc list-inside text-muted-foreground space-y-1 mt-4">
                 <li>Links with "go.cslifestyle.in" in the URL</li>
                 <li>Links to Amazon.in, Flipkart.com, or similar retailers</li>
-                <li>Buttons labeled "Check Price on Amazon" or "Buy Now"</li>
+                <li>Buttons labeled "Buy Now" or "Buy Now on Amazon"</li>
               </ul>
             </section>
 

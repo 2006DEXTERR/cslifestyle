@@ -6,7 +6,7 @@ import { Search, Plus, Edit, Trash2, ExternalLink, Star, X, Globe, BarChart3 } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { catalogApi, CatalogApiError, type CatalogBrand, type CatalogProduct } from '@/lib/api/catalog';
-import { productImageClass } from '@/lib/image';
+import { productThumbClass } from '@/lib/image';
 
 export default function BrandsAdminPage() {
   const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
@@ -240,7 +240,7 @@ export default function BrandsAdminPage() {
                         className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
                       >
                         <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden">
-                          {p.image && <img src={p.image} alt="" className={productImageClass} />}
+                          {p.image && <img src={p.image} alt="" className={productThumbClass} />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{p.name}</p>

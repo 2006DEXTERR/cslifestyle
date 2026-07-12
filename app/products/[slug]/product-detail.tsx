@@ -134,22 +134,28 @@ export function ProductDetail({
 
               {/* Rating */}
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`w-5 h-5 ${
-                        star <= Math.round(product.rating)
-                          ? 'fill-yellow-400 text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="font-semibold">{product.rating}</span>
-                <span className="text-muted-foreground">
-                  ({formatNumber(product.reviewCount)} reviews)
-                </span>
+                {product.rating > 0 ? (
+                  <>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-5 h-5 ${
+                            star <= Math.round(product.rating)
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="font-semibold">{product.rating}</span>
+                    <span className="text-muted-foreground">
+                      ({formatNumber(product.reviewCount)} reviews)
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">No ratings yet</span>
+                )}
               </div>
 
               {/* Price */}
@@ -208,7 +214,7 @@ export function ProductDetail({
               <div className="mt-auto space-y-3">
                 <a href={`/go/${product.asin}?src=product`} target="_blank" rel="noopener noreferrer nofollow sponsored">
                   <Button className="w-full h-14 text-lg bg-brand-gradient hover:opacity-90">
-                    Check Price on Amazon
+                    Buy Now on Amazon
                     <ExternalLink className="w-5 h-5 ml-2" />
                   </Button>
                 </a>

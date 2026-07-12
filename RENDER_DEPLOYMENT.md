@@ -195,7 +195,7 @@ skipped. There are **2 pending migrations** in this branch (`comparison_rich_sch
 | 1 | `GET /healthz` (api) | 200, `{status:"ok"}` |
 | 2 | `GET /readyz` (api) | 200, `database:"up"`, `redis:"up"` |
 | 3 | Homepage `/` | 200, no console/server errors; featured carousel + product cards render live data |
-| 4 | Product detail `/products/{slug}` | 200, correct image/title/price; "Check Price" → `/go/{asin}` |
+| 4 | Product detail `/products/{slug}` | 200, correct image/title/price; "Buy Now" → `/go/{asin}` |
 | 5 | Category `/categories/{slug}` | 200, shows products in that category |
 | 6 | Brand `/brands/{slug}` | 200, shows that brand's products |
 | 7 | Comparison `/comparisons/{slug}` | 200, spec table + winner + insights render |

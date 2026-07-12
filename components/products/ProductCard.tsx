@@ -8,7 +8,7 @@ import { Star, ExternalLink, Clock, TrendingUp, Award, Percent } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { Product } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
-import { productImageClass } from '@/lib/image';
+import { productThumbClass } from '@/lib/image';
 
 interface ProductCardProps {
   product: Product;
@@ -26,6 +26,10 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
   };
 
   const renderRating = (rating: number) => {
+    // No live rating yet (e.g. a freshly added/imported product) — never show a fake "0".
+    if (!rating || rating <= 0) {
+      return <span className="text-muted-foreground text-sm">No ratings yet</span>;
+    }
     return (
       <div className="flex items-center gap-1">
         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -46,7 +50,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
             <img
               src={product.image}
               alt={product.name}
-              className={productImageClass}
+              className={productThumbClass}
             />
             {product.trending && (
               <div className="absolute top-1 left-1">
@@ -87,7 +91,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
             <img
               src={product.image}
               alt={product.name}
-              className={`${productImageClass} transition-transform duration-500 group-hover:scale-105`}
+              className={`${productThumbClass} transition-transform duration-500 group-hover:scale-105`}
             />
             {product.discount && (
               <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-500 text-white text-xs font-semibold">
@@ -120,7 +124,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
                 )}
               </div>
               <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-gradient text-white text-sm font-medium hover:opacity-90 transition-opacity">
-                Check Price
+                Buy Now
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -165,7 +169,7 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
           <img
             src={product.image}
             alt={product.name}
-            className={`${productImageClass} transition-transform duration-300 group-hover:scale-105`}
+            className={`${productThumbClass} transition-transform duration-300 group-hover:scale-105`}
           />
           {product.discount && (
             <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/90 text-white text-xs font-medium">
@@ -181,13 +185,17 @@ export function ProductCard({ product, variant = 'default', showDeal = false }: 
             <h3 className="font-medium mt-0.5 line-clamp-2">{product.name}</h3>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-            <span className="text-sm font-medium">{product.rating}</span>
-            <span className="text-xs text-muted-foreground">
-              ({formatNumber(product.reviewCount)})
-            </span>
-          </div>
+          {product.rating > 0 ? (
+            <div className="flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+              <span className="text-sm font-medium">{product.rating}</span>
+              <span className="text-xs text-muted-foreground">
+                ({formatNumber(product.reviewCount)})
+              </span>
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">No ratings yet</span>
+          )}
 
           <div className="flex items-baseline gap-2 mt-auto">
             <p className="text-lg font-bold">

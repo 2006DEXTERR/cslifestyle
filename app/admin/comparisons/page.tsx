@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { contentApi, ContentApiError, type ContentComparison, type ComparisonSpecView } from '@/lib/api/content';
 import { catalogApi, type CatalogProduct } from '@/lib/api/catalog';
 import { formatDate } from '@/lib/format';
-import { productImageClass } from '@/lib/image';
+import { productThumbClass } from '@/lib/image';
 
 export default function ComparisonsAdminPage() {
   const [comparisons, setComparisons] = React.useState<ContentComparison[]>([]);
@@ -101,7 +101,7 @@ export default function ComparisonsAdminPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden">
-                          {comparison.productA?.image && <img src={comparison.productA.image} alt="" className={productImageClass} />}
+                          {comparison.productA?.image && <img src={comparison.productA.image} alt="" className={productThumbClass} />}
                         </div>
                         <div>
                           <p className="text-sm font-medium">{comparison.productA?.name}</p>
@@ -111,7 +111,7 @@ export default function ComparisonsAdminPage() {
                       <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden">
-                          {comparison.productB?.image && <img src={comparison.productB.image} alt="" className={productImageClass} />}
+                          {comparison.productB?.image && <img src={comparison.productB.image} alt="" className={productThumbClass} />}
                         </div>
                         <div>
                           <p className="text-sm font-medium">{comparison.productB?.name}</p>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, Trophy } from 'lucide-react';
 import { Comparison } from '@/lib/types';
-import { productImageClass } from '@/lib/image';
+import { productThumbClass } from '@/lib/image';
 
 interface ComparisonCardProps {
   comparison: Comparison;
@@ -25,7 +25,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
               <img
                 src={comparison.productA.image}
                 alt={comparison.productA.name}
-                className={productImageClass}
+                className={productThumbClass}
               />
             </div>
             <span className="text-muted-foreground">vs</span>
@@ -33,7 +33,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
               <img
                 src={comparison.productB.image}
                 alt={comparison.productB.name}
-                className={productImageClass}
+                className={productThumbClass}
               />
             </div>
           </div>
@@ -59,7 +59,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
             <img
               src={comparison.productA.image}
               alt={comparison.productA.name}
-              className={productImageClass}
+              className={productThumbClass}
             />
             {comparison.winner === 'A' && (
               <div className="absolute -top-1 -right-1 flex items-center justify-center w-6 h-6 rounded-full bg-brand-gradient text-white">
@@ -77,7 +77,7 @@ export function ComparisonCard({ comparison, variant = 'default' }: ComparisonCa
             <img
               src={comparison.productB.image}
               alt={comparison.productB.name}
-              className={productImageClass}
+              className={productThumbClass}
             />
             {comparison.winner === 'B' && (
               <div className="absolute -top-1 -right-1 flex items-center justify-center w-6 h-6 rounded-full bg-brand-gradient text-white">

@@ -7,7 +7,7 @@ import { Heart, Trash2, ExternalLink, ShoppingCart, ArrowLeft } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/products/ProductCard';
 import { products } from '@/lib/data';
-import { productImageClass } from '@/lib/image';
+import { productThumbClass } from '@/lib/image';
 
 export default function WishlistPage() {
   const [wishlistItems, setWishlistItems] = React.useState(products.slice(0, 4));
@@ -95,7 +95,7 @@ export default function WishlistPage() {
                                 <img
                                   src={product.image}
                                   alt={product.name}
-                                  className={productImageClass}
+                                  className={productThumbClass}
                                 />
                               </div>
                               <div>
@@ -171,7 +171,7 @@ export default function WishlistPage() {
                           <img
                             src={product.image}
                             alt={product.name}
-                            className={productImageClass}
+                            className={productThumbClass}
                           />
                         </Link>
                         <div className="flex-1 min-w-0">

@@ -40,7 +40,7 @@ import { ComparisonCard } from '@/components/comparisons/ComparisonCard';
 import { catalogApi, type CatalogProduct, type CatalogCategory, type CatalogBrand } from '@/lib/api/catalog';
 import { contentApi, type ContentGuide, type ContentComparison } from '@/lib/api/content';
 import { subscribeNewsletter } from '@/lib/api/marketing';
-import { productImageClass } from '@/lib/image';
+import { productThumbClass } from '@/lib/image';
 import { formatNumber } from '@/lib/format';
 
 const fadeInUp = {
@@ -629,17 +629,23 @@ export default function Home() {
                   <img
                     src={product.image}
                     alt={product.name}
-                    className={`${productImageClass} group-hover:scale-105 transition-transform duration-300`}
+                    className={`${productThumbClass} group-hover:scale-105 transition-transform duration-300`}
                   />
                 </div>
                 <h3 className="font-semibold text-foreground line-clamp-1 mb-1">{product.name}</h3>
                 <p className="text-sm text-muted-foreground mb-2">{product.category}</p>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-medium">{product.rating}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">({product.reviewCount} reviews)</span>
+                  {product.rating > 0 ? (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-sm font-medium">{product.rating}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">({formatNumber(product.reviewCount)} reviews)</span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No ratings yet</span>
+                  )}
                 </div>
                 <div className="mt-auto flex items-center justify-between">
                   <div>
