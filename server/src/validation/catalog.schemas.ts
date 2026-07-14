@@ -153,9 +153,11 @@ export const updateBrandSchema = createBrandSchema
 
 // ───────────────────────── List / search query parsers ─────────────────────────
 
+// perPage cap is 200 (not 100) so the admin catalog/content pages — which fetch the
+// full set with `perPage: 200` and paginate client-side — don't get a 400.
 export const productListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  perPage: z.coerce.number().int().min(1).max(100).default(12),
+  perPage: z.coerce.number().int().min(1).max(200).default(12),
   sort: z.enum(['popularity', 'price-low', 'price-high', 'rating', 'newest']).optional(),
   category: z.string().trim().optional(),
   brand: z.string().trim().optional(),

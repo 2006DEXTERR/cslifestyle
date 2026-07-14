@@ -9,16 +9,16 @@
  *   npm run guides:fix-images
  */
 import { PrismaClient } from '@prisma/client';
+import { GUIDE_IMAGES } from '../prisma/guide-images';
 
 const prisma = new PrismaClient();
 
-/** slug → cover image URL (real, category-matching catalog images). */
-const GUIDE_COVERS: Record<string, string> = {
-  'best-smartphones-under-30000': 'https://m.media-amazon.com/images/I/616-Eh2FbPL._SL1500_.jpg',
-  'best-wireless-earbuds-2024': 'https://m.media-amazon.com/images/I/715ANXAamCL._SL1500_.jpg',
-  'best-laptops-for-students': 'https://m.media-amazon.com/images/I/712WiT-wexL._SL1500_.jpg',
-  'best-tv-buying-guide': 'https://m.media-amazon.com/images/I/815dn640DHL._SL1500_.jpg',
-};
+/**
+ * slug → cover image URL. Sourced from the single canonical map (prisma/guide-images.ts)
+ * so this legacy command can never drift from `guides:sync-images` or the seed.
+ * For full sync (search reindex + cache invalidation) prefer `npm run guides:sync-images`.
+ */
+const GUIDE_COVERS: Record<string, string> = GUIDE_IMAGES;
 
 async function main(): Promise<void> {
   let updated = 0,

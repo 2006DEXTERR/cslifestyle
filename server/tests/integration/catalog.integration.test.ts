@@ -84,6 +84,17 @@ describe.skipIf(!RUN)('catalog integration (DB)', () => {
     expect(res.body.meta.pagination.total).toBeGreaterThanOrEqual(12);
   });
 
+  // Regression: the admin catalog page fetches the full set with perPage=200 and paginates
+  // client-side. The cap used to be 100 → 400 → an empty admin table. It must accept 200.
+  it('accepts perPage=200 (admin full-set fetch) instead of 400', async () => {
+    const res = await request(app).get('/api/products?status=all&perPage=200&sort=newest');
+    expect(res.status).toBe(200);
+    expect(res.body.meta.pagination.perPage).toBe(200);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(12);
+    // one past the cap still rejects
+    expect((await request(app).get('/api/products?perPage=201')).status).toBe(400);
+  });
+
   it('filters products by category and brand', async () => {
     const byCat = await request(app).get('/api/products?category=smartphones&perPage=50');
     expect(byCat.status).toBe(200);

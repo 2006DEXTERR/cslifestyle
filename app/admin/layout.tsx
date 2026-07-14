@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchAutocomplete } from '@/components/search/SearchAutocomplete';
 
 const sidebarSections = [
   {
@@ -275,13 +275,14 @@ export default function AdminLayout({
               >
                 <Menu className="w-5 h-5" />
               </Button>
-              <div className="relative hidden md:block w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products, guides..."
-                  className="pl-10 h-9"
-                />
-              </div>
+              {/* Reuses the shared site autocomplete (grouped DB-backed suggestions,
+                  debounce, keyboard + mouse). Enter/selection navigates to /search?q=. */}
+              <SearchAutocomplete
+                placeholder="Search products, guides..."
+                className="hidden md:block w-80"
+                inputClassName="pl-10 h-9"
+                iconClassName="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none"
+              />
             </div>
 
             <div className="flex items-center gap-2">

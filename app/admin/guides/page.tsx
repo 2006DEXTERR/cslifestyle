@@ -22,14 +22,16 @@ export default function GuidesAdminPage() {
   const [page, setPage] = React.useState(1);
   const [isEditorOpen, setIsEditorOpen] = React.useState(false);
   const [editingGuide, setEditingGuide] = React.useState<ContentGuide | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     const { items } = await contentApi.listGuides({ status: 'all', perPage: 200, sort: 'newest' });
     setGuides(items);
+    setLoadError(null);
   }, []);
 
   React.useEffect(() => {
-    void refresh().catch(() => setGuides([]));
+    void refresh().catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load guides.'));
     catalogApi.listCategories({ status: 'all', parent: 'all' }).then(setCategories).catch(() => setCategories([]));
     contentApi.listAuthors({ status: 'all', perPage: 200 }).then((r) => setAuthors(r.items)).catch(() => setAuthors([]));
     catalogApi.listProducts({ status: 'all', perPage: 200 }).then((r) => setProducts(r.items)).catch(() => setProducts([]));
@@ -74,6 +76,10 @@ export default function GuidesAdminPage() {
           Create Guide
         </Button>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600">{loadError}</div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-4 flex-wrap">

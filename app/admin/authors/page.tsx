@@ -13,14 +13,16 @@ export default function AuthorsAdminPage() {
   const [isEditorOpen, setIsEditorOpen] = React.useState(false);
   const [editingAuthor, setEditingAuthor] = React.useState<ContentAuthor | null>(null);
   const [selectedAuthor, setSelectedAuthor] = React.useState<ContentAuthor | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     const { items } = await contentApi.listAuthors({ status: 'all', perPage: 200 });
     setAuthors(items);
+    setLoadError(null);
   }, []);
 
   React.useEffect(() => {
-    void refresh().catch(() => setAuthors([]));
+    void refresh().catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load authors.'));
   }, [refresh]);
 
   // Open the profile drawer with the list row immediately, then upgrade it with the
@@ -69,6 +71,10 @@ export default function AuthorsAdminPage() {
           Add Author
         </Button>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600">{loadError}</div>
+      )}
 
       {/* Search */}
       <div className="relative max-w-sm">

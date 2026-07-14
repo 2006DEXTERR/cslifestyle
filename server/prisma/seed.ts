@@ -2,6 +2,9 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { COMPARISON_RICH } from './comparison-rich';
 import { PRODUCT_IMAGES } from './product-images';
+import { GUIDE_IMAGES } from './guide-images';
+import { CANONICAL_PRODUCTS } from './canonical-products';
+import { deriveComparisonTitle, replaceProductNames } from '../src/lib/comparison-canonical';
 import bcrypt from 'bcrypt';
 import {
   PERMISSIONS,
@@ -297,6 +300,12 @@ async function seedCatalog(): Promise<void> {
     (await prisma.brand.findMany({ select: { id: true, slug: true } })).map((b) => [b.slug, b.id]),
   );
 
+  // Old→canonical name pairs so product prose (descriptions) never restores old names.
+  const prodNamePairs = mockProducts
+    .map((mp): [string, string] => [mp.name, CANONICAL_PRODUCTS[mp.slug]?.name ?? mp.name])
+    .filter(([o, n]) => o !== n);
+  const prodSwap = (t: string): string => replaceProductNames(t, prodNamePairs) ?? t;
+
   // Products.
   for (const p of mockProducts) {
     const categoryId = catBySlug.get(p.categorySlug);
@@ -305,30 +314,31 @@ async function seedCatalog(): Promise<void> {
       continue;
     }
     const brandId = brandBySlug.get(p.brandSlug) ?? null;
-    // NOTE: the mock has no real ASINs, so we mint a clearly-marked PLACEHOLDER
-    // (`B0SEED####`). It is flagged by `productDataWarnings`, rejected by the /go
-    // redirect engine, and produces NO affiliate URL — import real ASINs/images via
-    // `npm run products:bulk` (see server/README.md). Do not treat these as real.
-    const asin = `B0SEED${p.id.padStart(4, '0')}`;
+    // Canonical owner-maintained data (server/my-products.csv) wins over the lib/data mock
+    // so a reseed can NEVER restore old names / ASINs / images / affiliate links. When a
+    // slug has no canonical value we fall back to the mock (asin → clearly-marked
+    // `B0SEED####` placeholder, flagged by productDataWarnings and yielding no affiliate URL).
+    const canon = CANONICAL_PRODUCTS[p.slug];
+    const asin = canon?.asin ?? `B0SEED${p.id.padStart(4, '0')}`;
     // Generate the affiliate URL from the ASIN ONLY when it's real; placeholder
     // ASINs → null (never the old `amazon.in/dp/example` stub).
     const affiliateUrl =
       resolveAffiliateUrl(asin, p.affiliateUrl, { tag: 'cslifestyle-21', domain: 'amazon.in' }) || null;
 
     // Canonical per-product image (verified catalog). Overrides the generic lib/data
-    // stock image so EVERY reseed restores the real product photo. Falls back to the
-    // mock image only when a slug has no canonical entry. Both Product.image and the
-    // ProductImage rows below use this same resolved value.
-    const primaryImage = PRODUCT_IMAGES[p.slug] ?? p.image;
-    const imageUrls = PRODUCT_IMAGES[p.slug] ? [PRODUCT_IMAGES[p.slug]] : p.images;
+    // stock image so EVERY reseed restores the real product photo. Both Product.image and
+    // the ProductImage rows below use this same resolved value.
+    const primaryImage = canon?.image ?? PRODUCT_IMAGES[p.slug] ?? p.image;
+    const imageUrls = primaryImage !== p.image ? [primaryImage] : p.images;
+    const title = canon?.name ?? p.name;
 
     const data = {
       asin,
       categoryId,
       brandId,
-      title: p.name,
-      shortDescription: p.description.slice(0, 280),
-      description: p.description,
+      title,
+      shortDescription: prodSwap(p.description.slice(0, 280)),
+      description: prodSwap(p.description),
       image: primaryImage,
       gallery: imageUrls,
       specifications: p.specifications,
@@ -416,7 +426,9 @@ async function seedContent(): Promise<void> {
       title: g.title,
       excerpt: g.excerpt,
       content: g.content,
-      coverImage: g.coverImage,
+      // Canonical guide covers win over the lib/data mock so a reseed never restores
+      // the old Pexels stock photos (see prisma/guide-images.ts).
+      coverImage: GUIDE_IMAGES[g.slug] ?? g.coverImage,
       categoryId: catBySlug.get(g.categorySlug) ?? null,
       authorId: authorBySlug.get(g.author.slug) ?? null,
       readingTime: g.readingTime,
@@ -440,6 +452,13 @@ async function seedContent(): Promise<void> {
   }
   console.log(`   ✓ ${mockGuides.length} guides (+ product picks)`);
 
+  // Canonical old→new product-name pairs so comparison text never restores old names.
+  const namePairs = mockProducts
+    .map((p): [string, string] => [p.name, CANONICAL_PRODUCTS[p.slug]?.name ?? p.name])
+    .filter(([o, n]) => o !== n);
+  const canonName = (slug: string, fallback: string): string => CANONICAL_PRODUCTS[slug]?.name ?? fallback;
+  const swap = (t: string | null | undefined): string | null => replaceProductNames(t, namePairs);
+
   // Comparisons.
   for (const c of mockComparisons) {
     const productAId = prodBySlug.get(c.productA.slug);
@@ -450,23 +469,27 @@ async function seedContent(): Promise<void> {
     }
     // Rich demo overlay (grouped/typed specs + editorial content) for known slugs.
     const rich = COMPARISON_RICH[c.slug];
+    // Derive the title from canonical product names + repair prose so a reseed can never
+    // restore old names (see src/lib/comparison-canonical.ts).
+    const aName = canonName(c.productA.slug, c.productA.name);
+    const bName = canonName(c.productB.slug, c.productB.name);
     const data = {
-      title: c.title,
-      excerpt: c.excerpt,
-      summary: c.summary,
+      title: swap(deriveComparisonTitle(c.title, aName, bName)),
+      excerpt: swap(c.excerpt),
+      summary: swap(c.summary),
       productAId,
       productBId,
-      verdict: c.verdict,
+      verdict: swap(c.verdict),
       winner: rich?.winner ?? c.winner,
       prosCons: c.prosCons,
       status: 'published' as const,
       publishedAt: new Date('2024-01-15'),
       ...(rich
         ? {
-            editorSummary: rich.editorSummary ?? null,
-            whoShouldBuyA: rich.whoShouldBuyA ?? null,
-            whoShouldBuyB: rich.whoShouldBuyB ?? null,
-            bestFor: rich.bestFor ?? null,
+            editorSummary: swap(rich.editorSummary),
+            whoShouldBuyA: swap(rich.whoShouldBuyA),
+            whoShouldBuyB: swap(rich.whoShouldBuyB),
+            bestFor: swap(rich.bestFor),
             faq: (rich.faq ?? []) as unknown as Prisma.InputJsonValue,
             comparisonScoreA: rich.comparisonScoreA ?? null,
             comparisonScoreB: rich.comparisonScoreB ?? null,

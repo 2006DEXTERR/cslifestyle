@@ -178,7 +178,7 @@ export const updateComparisonSchema = z
 
 export const authorListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  perPage: z.coerce.number().int().min(1).max(100).default(24),
+  perPage: z.coerce.number().int().min(1).max(200).default(24),
   q: z.string().trim().max(200).optional(),
   status: z.enum(['active', 'all']).default('active'),
   sort: z.enum(['name', 'newest']).default('name'),
@@ -186,7 +186,7 @@ export const authorListQuerySchema = z.object({
 
 export const guideListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  perPage: z.coerce.number().int().min(1).max(100).default(12),
+  perPage: z.coerce.number().int().min(1).max(200).default(12),
   q: z.string().trim().max(200).optional(),
   category: z.string().trim().optional(),
   author: z.string().trim().optional(),
@@ -196,7 +196,7 @@ export const guideListQuerySchema = z.object({
 
 export const comparisonListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  perPage: z.coerce.number().int().min(1).max(100).default(12),
+  perPage: z.coerce.number().int().min(1).max(200).default(12),
   q: z.string().trim().max(200).optional(),
   status: z.enum(['published', 'draft', 'all']).default('published'),
   sort: z.enum(['newest', 'oldest', 'title']).default('newest'),

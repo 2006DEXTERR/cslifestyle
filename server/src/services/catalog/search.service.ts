@@ -9,6 +9,7 @@ import {
   type PresentedBrand,
 } from './presenters';
 import { likeFragments, rankBySearch } from '../../lib/search';
+import { cacheWrap, CACHE_NS, TTL } from '../../lib/cache';
 import type { SearchQueryInput } from '../../validation/catalog.schemas';
 
 export interface CatalogSearchResult {
@@ -33,16 +34,33 @@ export async function searchCatalog(
 ): Promise<CatalogSearchResult> {
   const { q, type, limit } = input;
   const fragments = likeFragments(q);
+
+  // Cache the (public, non-personalized) result set — search fires on every keystroke but
+  // the catalog changes rarely. Keyed by type+limit+term; busted by bust.products/etc. via
+  // the shared `sugg:` prefix. Empty/stopword-only queries skip the DB entirely.
+  const result: CatalogSearchResult = fragments.length
+    ? await cacheWrap(
+        `${CACHE_NS.suggestions}catalog:${type}:${limit}:${q.trim().toLowerCase()}`,
+        TTL.suggestions,
+        () => computeSearchResults(input, fragments),
+      )
+    : { query: q, type, products: [], categories: [], brands: [], total: 0 };
+
+  // Analytics logging is best-effort and NON-BLOCKING — never delay search on a write.
+  logSearch(q, type, result.total, ipHash);
+  return result;
+}
+
+async function computeSearchResults(
+  input: SearchQueryInput,
+  fragments: string[],
+): Promise<CatalogSearchResult> {
+  const { q, type, limit } = input;
   const like = (f: string) => ({ contains: f, mode: 'insensitive' as const });
 
   const wantProducts = type === 'all' || type === 'products';
   const wantCategories = type === 'all' || type === 'categories';
   const wantBrands = type === 'all' || type === 'brands';
-
-  // Empty/stopword-only queries can't match anything meaningfully.
-  if (!fragments.length) {
-    return logAndReturn(q, type, [], [], [], ipHash);
-  }
 
   const [productRows, categoryRows, brandRows] = await Promise.all([
     wantProducts
@@ -86,27 +104,13 @@ export async function searchCatalog(
   const brands = rankBySearch(q, brandRows, (b) => ({ title: b.name, slug: b.slug }))
     .slice(0, limit).map((b) => presentBrand(b));
 
-  return logAndReturn(q, type, products, categories, brands, ipHash);
+  const total = products.length + categories.length + brands.length;
+  return { query: q, type, products, categories, brands, total };
 }
 
-async function logAndReturn(
-  q: string,
-  type: SearchQueryInput['type'],
-  products: PresentedProduct[],
-  categories: PresentedCategory[],
-  brands: PresentedBrand[],
-  ipHash?: string,
-): Promise<CatalogSearchResult> {
-  const total = products.length + categories.length + brands.length;
-
-  // Log the query (best-effort — never block/break search on a logging failure).
-  try {
-    await prisma.searchQuery.create({
-      data: { query: q, type, resultsCount: total, ipHash: ipHash ?? null },
-    });
-  } catch (err) {
-    logger.warn({ err }, 'failed to log search query');
-  }
-
-  return { query: q, type, products, categories, brands, total };
+/** Fire-and-forget analytics write — best-effort, never blocks or breaks the response. */
+function logSearch(q: string, type: SearchQueryInput['type'], total: number, ipHash?: string): void {
+  prisma.searchQuery
+    .create({ data: { query: q, type, resultsCount: total, ipHash: ipHash ?? null } })
+    .catch((err) => logger.warn({ err }, 'failed to log search query'));
 }

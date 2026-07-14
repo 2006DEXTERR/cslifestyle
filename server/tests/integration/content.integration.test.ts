@@ -68,6 +68,16 @@ describe.skipIf(!RUN)('content integration (DB)', () => {
     expect(c.body.data.length).toBeGreaterThanOrEqual(3);
   });
 
+  // Regression: the admin content pages fetch the full set with perPage=200. The cap used
+  // to be 100 → 400 → empty admin Guides/Comparisons/Authors tables. All must accept 200.
+  it('accepts perPage=200 on guides/comparisons/authors (admin full-set fetch)', async () => {
+    for (const path of ['/api/guides', '/api/comparisons', '/api/authors']) {
+      const res = await request(app).get(`${path}?status=all&perPage=200`);
+      expect(res.status, `${path} should accept perPage=200`).toBe(200);
+    }
+    expect((await request(app).get('/api/guides?perPage=201')).status).toBe(400);
+  });
+
   it('gets a guide by slug with author + product picks', async () => {
     const res = await request(app).get('/api/guides/best-smartphones-under-30000');
     expect(res.status).toBe(200);

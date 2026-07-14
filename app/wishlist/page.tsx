@@ -5,15 +5,30 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Trash2, ExternalLink, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ProductCard } from '@/components/products/ProductCard';
-import { products } from '@/lib/data';
+import { catalogApi, type CatalogProduct } from '@/lib/api/catalog';
 import { productThumbClass, resolveProductImage } from '@/lib/image';
 
 export default function WishlistPage() {
-  const [wishlistItems, setWishlistItems] = React.useState(products.slice(0, 4));
+  // Wishlist products come from the live catalog API (same shape/images as the rest of
+  // the storefront), not the lib/data mock — so images match the canonical DB URLs.
+  // The app has no persisted wishlist store, so we show recent catalog products the user
+  // can curate in-session (remove / clear), preserving the previous demo behaviour.
+  const [wishlistItems, setWishlistItems] = React.useState<CatalogProduct[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    catalogApi
+      .listProducts({ perPage: 4, sort: 'newest' })
+      .then((r) => { if (active) { setWishlistItems(r.items); setError(null); } })
+      .catch((e) => { if (active) setError(e instanceof Error ? e.message : 'Could not load your wishlist.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const removeFromWishlist = (productId: string) => {
-    setWishlistItems(wishlistItems.filter((item) => item.id !== productId));
+    setWishlistItems((items) => items.filter((item) => item.id !== productId));
   };
 
   const clearWishlist = () => {
@@ -62,7 +77,40 @@ export default function WishlistPage() {
       <section className="py-8">
         <div className="container mx-auto px-4">
           <AnimatePresence mode="wait">
-            {wishlistItems.length > 0 ? (
+            {loading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-center py-16"
+              >
+                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mx-auto mb-6 animate-pulse">
+                  <Heart className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground">Loading your wishlist…</p>
+              </motion.div>
+            ) : error ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="text-center py-16"
+              >
+                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+                  <Heart className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Couldn&apos;t load your wishlist</h2>
+                <p className="text-muted-foreground mb-8 max-w-md mx-auto">{error}</p>
+                <Link href="/categories">
+                  <Button className="bg-brand-gradient hover:opacity-90">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Browse Products
+                  </Button>
+                </Link>
+              </motion.div>
+            ) : wishlistItems.length > 0 ? (
               <motion.div
                 key="wishlist"
                 initial={{ opacity: 0 }}

@@ -80,12 +80,17 @@ export default function ProductsAdminPage() {
   const [categories, setCategories] = React.useState<CatalogCategory[]>([]);
   const [brands, setBrands] = React.useState<CatalogBrand[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
     try {
       const { items } = await catalogApi.listProducts({ status: 'all', perPage: 200, sort: 'newest' });
       setProducts(items.map(toRow));
+      setLoadError(null);
+    } catch (err) {
+      // Surface the real reason instead of silently showing an empty table.
+      setLoadError(err instanceof Error ? err.message : 'Could not load products. Check the backend is running and reachable.');
     } finally {
       setLoading(false);
     }
@@ -286,6 +291,10 @@ export default function ProductsAdminPage() {
           Add Product
         </Button>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600">{loadError}</div>
+      )}
 
       {/* Filters and Search */}
       <div className="flex items-center gap-4 flex-wrap">

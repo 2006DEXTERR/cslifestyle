@@ -28,6 +28,8 @@ describe('cache layer — safe fallback when Redis is unavailable', () => {
     await expect(bust.brands()).resolves.toBeUndefined();
     await expect(bust.guides()).resolves.toBeUndefined();
     await expect(bust.comparisons()).resolves.toBeUndefined();
+    // Composed helper used by scripts/sync-product-images.ts — must also be a safe no-op.
+    await expect(bust.productImages()).resolves.toBeUndefined();
   });
 
   it('exposes namespaced, deterministic key prefixes + sane TTLs', () => {

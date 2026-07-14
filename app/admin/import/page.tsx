@@ -44,10 +44,20 @@ const importTypes = [
 function friendlyError(err: unknown): string {
   if (err instanceof ImportApiError) {
     if (err.status === 401) return 'Your admin session has expired. Please sign in again to import.';
-    if (err.status === 403) return 'You don’t have permission to import. This needs the import.create (or import.manage) permission — ask an admin to grant it.';
-    return err.message; // e.g. the clear PA-API "credentials are not configured" message
+    if (err.status === 403) {
+      return /csrf/i.test(err.message)
+        ? 'Your session’s security token is missing or stale. Refresh the page and try again.'
+        : 'You don’t have permission to import. This needs the import.create (or import.manage) permission — ask an admin to grant it.';
+    }
+    if (err.status >= 500) return 'The server hit an error starting the import. Check the backend logs and try again.';
+    // 400/409 etc. — the backend already sends a specific, actionable message
+    // (e.g. "CSV requires columns …", "Amazon PA-API credentials are not configured.").
+    return err.message && err.message !== 'Request failed'
+      ? err.message
+      : 'The import request was rejected. Check the fields and try again.';
   }
-  return err instanceof Error ? err.message : 'Something went wrong.';
+  // A thrown fetch/network error (backend unreachable / proxy down) — never a silent fail.
+  return 'Couldn’t reach the server. Make sure the backend is running and you’re still signed in.';
 }
 
 const duplicateModes: { id: DuplicateMode; label: string; hint: string }[] = [
@@ -680,8 +690,19 @@ export default function ImportCenterPage() {
 
                   {urlSelected ? (
                     <div className="flex items-start gap-2 rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/30 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">
-                      <AlertTriangle className="h-4 w-4 mt-0.5" />
-                      <span>URL import is not available yet. Use ASIN, CSV or Category import.</span>
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <p className="font-medium">Importing from an arbitrary product URL isn’t supported.</p>
+                        <p>
+                          Pulling data from a retailer page would require scraping, which CSLifestyle does not do.
+                          Use a supported source instead:
+                        </p>
+                        <ul className="ml-4 list-disc">
+                          <li><span className="font-medium">ASIN Import</span> — paste Amazon ASINs (from a product URL’s <code>/dp/XXXX</code>).</li>
+                          <li><span className="font-medium">CSV Import</span> — bulk upload with your own data.</li>
+                          <li><span className="font-medium">Import through API</span> — Amazon PA-API (requires PA-API credentials).</li>
+                        </ul>
+                      </div>
                     </div>
                   ) : (
                     <>

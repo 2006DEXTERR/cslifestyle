@@ -86,4 +86,15 @@ export const bust = {
   brands: (): Promise<void> => bustAll(['brand:', 'prod:', 'sugg:', 'admin:overview']),
   guides: (): Promise<void> => bustAll(['guide:', 'sugg:', 'admin:overview']),
   comparisons: (): Promise<void> => bustAll(['comp:', 'sugg:', 'admin:overview']),
+  /**
+   * Every cache group that can embed a product image — used after a bulk product-image
+   * change (see scripts/sync-product-images.ts). Composed from the domain helpers above
+   * so cache-key prefixes stay defined in exactly one place:
+   *   - products()    → prod:* (lists + details), cat:*, brand:*, sugg:* (search), admin:overview
+   *   - comparisons() → comp:* (spec tables render product images)
+   *   - guides()      → guide:* (product picks embed images)
+   * Homepage / category / brand / search pages all read the product-list caches above.
+   */
+  productImages: (): Promise<void> =>
+    Promise.all([bust.products(), bust.comparisons(), bust.guides()]).then(() => undefined),
 };

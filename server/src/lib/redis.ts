@@ -25,3 +25,21 @@ export async function connectRedis(): Promise<void> {
     await redis.connect();
   }
 }
+
+/**
+ * Close the connection cleanly if it was ever opened. Safe to call in any state —
+ * a lazy client that never connected (`wait`) is simply torn down synchronously so a
+ * short-lived script/process can exit without a lingering socket keeping it alive.
+ */
+export async function closeRedis(): Promise<void> {
+  if (redis.status === 'end') return;
+  if (redis.status === 'wait') {
+    redis.disconnect();
+    return;
+  }
+  try {
+    await redis.quit();
+  } catch {
+    redis.disconnect();
+  }
+}

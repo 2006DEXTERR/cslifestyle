@@ -17,14 +17,16 @@ export default function ComparisonsAdminPage() {
   const [editing, setEditing] = React.useState<ContentComparison | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     const { items } = await contentApi.listComparisons({ status: 'all', perPage: 200, sort: 'newest' });
     setComparisons(items);
+    setLoadError(null);
   }, []);
 
   React.useEffect(() => {
-    void refresh().catch(() => setComparisons([]));
+    void refresh().catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load comparisons.'));
     catalogApi.listProducts({ status: 'all', perPage: 200 }).then((r) => setProducts(r.items)).catch(() => setProducts([]));
   }, [refresh]);
 
@@ -61,6 +63,10 @@ export default function ComparisonsAdminPage() {
           Create Comparison
         </Button>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600">{loadError}</div>
+      )}
 
       {/* Search + filter */}
       <div className="flex items-center gap-4 flex-wrap">
