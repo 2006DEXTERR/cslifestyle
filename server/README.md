@@ -157,6 +157,44 @@ All JSON responses use the envelope `{ status, data, meta, message, errors }`.
 | `npm run prisma:generate` | Generate Prisma client |
 | `npm run prisma:migrate` | Create/apply a dev migration (Phase 1+) |
 
+## Media storage (local / S3)
+
+Uploaded binary files (Media Library) go through one provider abstraction selected by
+`STORAGE_DRIVER`. Switching the driver affects **new uploads only** — existing files keep
+the provider recorded on their row (`media_assets.storage_provider`). Existing **external
+image URLs (e.g. Amazon) are plain URL strings on other tables and are never touched** by
+the storage layer; URL-only image inputs keep working unchanged.
+
+**Local development** (default — disk under `UPLOAD_DIR`, served at `/uploads`):
+
+```
+STORAGE_DRIVER=local
+UPLOAD_DIR=uploads
+MEDIA_BASE_URL=http://localhost:4000   # '' → same-origin /uploads
+```
+
+**Render production** (AWS S3 — backend-only credentials):
+
+```
+STORAGE_DRIVER=s3
+AWS_REGION=<region>
+AWS_S3_BUCKET=<bucket>
+AWS_ACCESS_KEY_ID=<secret>
+AWS_SECRET_ACCESS_KEY=<secret>
+AWS_S3_PUBLIC_BASE_URL=<public bucket or CDN URL>   # optional; else standard regional URL
+```
+
+Notes:
+- Local storage is fine for development. **Render's local filesystem is ephemeral — not
+  durable across deploys/restarts** — so production must use **S3** (or a mounted
+  persistent disk with `STORAGE_DRIVER=local`).
+- **AWS credentials belong only in the backend** Render environment. They are never sent to
+  the frontend, never logged, and never returned in API responses.
+- When `STORAGE_DRIVER=s3`, the four `AWS_*` credentials are **validated at startup**; when
+  `local`, the AWS settings are ignored and not required (and vice-versa).
+- Object keys are content-hash based and server-generated (no ACLs; deletion uses the
+  stored key, never a parsed URL) — the IAM user can be restricted to one bucket.
+
 ## Layout
 
 ```

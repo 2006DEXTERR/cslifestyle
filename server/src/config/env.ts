@@ -111,6 +111,20 @@ const EnvSchema = z
     MEDIA_BASE_URL: z.string().default(''), // '' → same-origin /uploads
     MEDIA_MAX_FILE_MB: z.coerce.number().int().min(1).max(50).default(10),
 
+    // Storage provider for Media Library uploads. `local` = disk under UPLOAD_DIR served
+    // at /uploads (default; ideal for dev). `s3` = AWS S3 via backend-only credentials.
+    // Switching this affects NEW uploads only — existing files keep their stored provider.
+    STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+    // AWS S3 settings — only used AND validated when STORAGE_DRIVER=s3 (see superRefine).
+    // Credentials are backend-only and MUST NOT be exposed to the frontend.
+    // AWS_S3_PUBLIC_BASE_URL: public bucket/CDN base for object URLs; when unset a standard
+    // regional S3 URL (https://{bucket}.s3.{region}.amazonaws.com) is used.
+    AWS_REGION: z.string().optional(),
+    AWS_S3_BUCKET: z.string().optional(),
+    AWS_ACCESS_KEY_ID: z.string().optional(),
+    AWS_SECRET_ACCESS_KEY: z.string().optional(),
+    AWS_S3_PUBLIC_BASE_URL: z.string().optional(),
+
     // Affiliate — canonical Amazon associate tag + domain used to GENERATE public
     // product affiliate URLs (https://www.amazon.in/dp/{ASIN}?tag=...). The /go
     // redirect engine still reads the DB AffiliateSettings; these defaults keep the
@@ -167,6 +181,21 @@ const EnvSchema = z
           path: ['ENCRYPTION_KEY'],
           message: 'ENCRYPTION_KEY must be at least 32 characters in production',
         });
+      }
+    }
+
+    // S3 driver requires its credentials at startup; local-only settings are never
+    // required when s3 is selected, and these are never required when local is selected.
+    if (val.STORAGE_DRIVER === 's3') {
+      const s3Required = ['AWS_REGION', 'AWS_S3_BUCKET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'] as const;
+      for (const key of s3Required) {
+        if (!val[key]) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required when STORAGE_DRIVER=s3`,
+          });
+        }
       }
     }
   });

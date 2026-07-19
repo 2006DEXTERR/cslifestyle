@@ -9,9 +9,10 @@ afterAll(async () => {
 });
 
 describe('media storage helpers', () => {
-  it('allows exactly jpg/jpeg/png/webp/svg', () => {
-    expect(Object.keys(ALLOWED_MIME).sort()).toEqual(['image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml', 'image/webp']);
+  it('allows exactly jpg/jpeg/png/webp/avif/svg', () => {
+    expect(Object.keys(ALLOWED_MIME).sort()).toEqual(['image/avif', 'image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml', 'image/webp']);
     expect(isAllowedMime('image/png')).toBe(true);
+    expect(isAllowedMime('image/avif')).toBe(true);
     expect(isAllowedMime('image/gif')).toBe(false);
     expect(isAllowedMime('application/pdf')).toBe(false);
   });

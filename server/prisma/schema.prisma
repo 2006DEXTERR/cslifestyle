@@ -1190,7 +1190,8 @@ model MediaAsset {
   height       Int?
   altText      String?      @map("alt_text")
   caption      String?
-  storagePath  String       @map("storage_path") // relative path of the original under UPLOAD_DIR
+  storagePath  String       @map("storage_path") // provider object key (hash-based); relative path under UPLOAD_DIR for local
+  storageProvider String    @default("local") @map("storage_provider") // 'local' | 's3' — which backend holds the bytes
   variants     Json? // { thumbnail, webp, sizes: [{ w, path }] }
   hash         String       @unique // SHA-256 of bytes (duplicate detection)
   folderId     String?      @map("folder_id")

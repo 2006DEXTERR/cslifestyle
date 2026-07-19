@@ -2,6 +2,8 @@ import { Prisma, type MediaAsset, type MediaUsage } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { ApiError, type Pagination } from '../../lib/http';
 import { ALLOWED_MIME, hashBuffer, storeAndOptimize, deleteFiles, publicUrl, type OptimizeResult } from './storage';
+import type { StorageProviderName } from './providers';
+import { sniffImageMime, mimeMatchesSignature } from './signature';
 
 /**
  * Media Library service (Phase 10): upload (hash-deduped + optimized), browse/search,
@@ -12,6 +14,9 @@ type Variants = OptimizeResult['variants'];
 
 export function presentAsset(a: MediaAsset & { usages?: MediaUsage[] }): Record<string, unknown> {
   const v = (a.variants as Variants | null) ?? { thumbnail: null, webp: null, sizes: [] };
+  // Resolve every URL with the provider that actually holds the bytes (legacy rows → local).
+  const provider = ((a.storageProvider as StorageProviderName) ?? 'local') as StorageProviderName;
+  const url = (key: string | null): string | null => publicUrl(key, provider);
   return {
     id: a.id,
     filename: a.filename,
@@ -23,10 +28,11 @@ export function presentAsset(a: MediaAsset & { usages?: MediaUsage[] }): Record<
     altText: a.altText,
     caption: a.caption,
     folderId: a.folderId,
-    url: publicUrl(a.storagePath),
-    thumbnailUrl: publicUrl(v.thumbnail) ?? publicUrl(a.storagePath),
-    webpUrl: publicUrl(v.webp),
-    sizes: (v.sizes ?? []).map((s) => ({ w: s.w, url: publicUrl(s.path) })),
+    provider,
+    url: url(a.storagePath),
+    thumbnailUrl: url(v.thumbnail) ?? url(a.storagePath),
+    webpUrl: url(v.webp),
+    sizes: (v.sizes ?? []).map((s) => ({ w: s.w, url: url(s.path) })),
     hash: a.hash,
     createdAt: a.createdAt.toISOString(),
     ...(a.usages ? { usages: a.usages.map(presentUsage), usageCount: a.usages.length } : {}),
@@ -39,6 +45,19 @@ function presentUsage(u: MediaUsage): Record<string, unknown> {
 
 export function isAllowedMime(mime: string): boolean {
   return mime in ALLOWED_MIME;
+}
+
+/**
+ * Validate uploaded bytes: allowed type, non-empty, and — for defence-in-depth — the real
+ * file signature (magic bytes) must match the declared MIME so a renamed/spoofed file is
+ * rejected, not just one with a bad extension.
+ */
+function validateUploadBytes(buffer: Buffer, mime: string): void {
+  if (!isAllowedMime(mime)) throw ApiError.badRequest(`Unsupported file type: ${mime}`);
+  if (!buffer || buffer.length === 0) throw ApiError.badRequest('Empty file');
+  if (!mimeMatchesSignature(mime, sniffImageMime(buffer))) {
+    throw ApiError.badRequest('File content does not match its declared image type');
+  }
 }
 
 // ── Upload ──
@@ -55,31 +74,38 @@ export interface UploadInput {
 }
 
 export async function uploadAsset(input: UploadInput): Promise<{ asset: Record<string, unknown>; duplicate: boolean }> {
-  if (!isAllowedMime(input.mimeType)) throw ApiError.badRequest(`Unsupported file type: ${input.mimeType}`);
+  validateUploadBytes(input.buffer, input.mimeType);
   const hash = hashBuffer(input.buffer);
 
   const existing = await prisma.mediaAsset.findUnique({ where: { hash } });
   if (existing) return { asset: presentAsset(existing), duplicate: true };
 
   const opt = await storeAndOptimize(input.buffer, input.mimeType, hash);
-  const asset = await prisma.mediaAsset.create({
-    data: {
-      filename: opt.storagePath,
-      originalName: input.originalName.slice(0, 255),
-      mimeType: input.mimeType,
-      size: input.size,
-      width: opt.width,
-      height: opt.height,
-      altText: input.altText ?? null,
-      caption: input.caption ?? null,
-      storagePath: opt.storagePath,
-      variants: opt.variants as unknown as Prisma.InputJsonValue,
-      hash,
-      folderId: input.folderId ?? null,
-      createdById: input.userId ?? null,
-    },
-  });
-  return { asset: presentAsset(asset), duplicate: false };
+  try {
+    const asset = await prisma.mediaAsset.create({
+      data: {
+        filename: opt.storagePath,
+        originalName: input.originalName.slice(0, 255),
+        mimeType: input.mimeType,
+        size: input.size,
+        width: opt.width,
+        height: opt.height,
+        altText: input.altText ?? null,
+        caption: input.caption ?? null,
+        storagePath: opt.storagePath,
+        storageProvider: opt.provider,
+        variants: opt.variants as unknown as Prisma.InputJsonValue,
+        hash,
+        folderId: input.folderId ?? null,
+        createdById: input.userId ?? null,
+      },
+    });
+    return { asset: presentAsset(asset), duplicate: false };
+  } catch (err) {
+    // DB save failed → remove the just-stored objects so nothing is orphaned in storage.
+    await deleteFiles(opt.storagePath, opt.variants, opt.provider).catch(() => undefined);
+    throw err;
+  }
 }
 
 // ── Browse / search ──
@@ -132,7 +158,7 @@ export async function updateAsset(id: string, patch: { altText?: string; caption
 export async function replaceAsset(id: string, input: { buffer: Buffer; originalName: string; mimeType: string; size: number }): Promise<Record<string, unknown>> {
   const existing = await prisma.mediaAsset.findUnique({ where: { id } });
   if (!existing) throw ApiError.notFound('Media asset not found');
-  if (!isAllowedMime(input.mimeType)) throw ApiError.badRequest(`Unsupported file type: ${input.mimeType}`);
+  validateUploadBytes(input.buffer, input.mimeType);
 
   const newHash = hashBuffer(input.buffer);
   if (newHash !== existing.hash) {
@@ -140,30 +166,49 @@ export async function replaceAsset(id: string, input: { buffer: Buffer; original
     if (clash && clash.id !== id) throw new ApiError(409, 'An identical asset already exists');
   }
 
-  await deleteFiles(existing.storagePath, existing.variants as Variants | null);
+  // Ordering (requirement 9): upload the NEW object first, update the DB, and only then
+  // delete the OLD managed object — never delete the old bytes before the DB update succeeds.
   const opt = await storeAndOptimize(input.buffer, input.mimeType, newHash);
-  const a = await prisma.mediaAsset.update({
-    where: { id },
-    data: {
-      filename: opt.storagePath,
-      originalName: input.originalName.slice(0, 255),
-      mimeType: input.mimeType,
-      size: input.size,
-      width: opt.width,
-      height: opt.height,
-      storagePath: opt.storagePath,
-      variants: opt.variants as unknown as Prisma.InputJsonValue,
-      hash: newHash,
-    },
-    include: { usages: true },
-  });
+  let a;
+  try {
+    a = await prisma.mediaAsset.update({
+      where: { id },
+      data: {
+        filename: opt.storagePath,
+        originalName: input.originalName.slice(0, 255),
+        mimeType: input.mimeType,
+        size: input.size,
+        width: opt.width,
+        height: opt.height,
+        storagePath: opt.storagePath,
+        storageProvider: opt.provider,
+        variants: opt.variants as unknown as Prisma.InputJsonValue,
+        hash: newHash,
+      },
+      include: { usages: true },
+    });
+  } catch (err) {
+    // DB update failed → remove the newly stored object; the old asset is untouched.
+    await deleteFiles(opt.storagePath, opt.variants, opt.provider).catch(() => undefined);
+    throw err;
+  }
+
+  // Delete the old managed object only after the DB commit, and only when the key actually
+  // changed (a same-hash replace reuses the same keys — never delete them).
+  if (existing.storagePath !== opt.storagePath) {
+    await deleteFiles(
+      existing.storagePath,
+      existing.variants as Variants | null,
+      (existing.storageProvider as StorageProviderName) ?? 'local',
+    );
+  }
   return presentAsset(a);
 }
 
 export async function deleteAsset(id: string): Promise<{ id: string; usageCount: number }> {
   const a = await prisma.mediaAsset.findUnique({ where: { id }, include: { _count: { select: { usages: true } } } });
   if (!a) throw ApiError.notFound('Media asset not found');
-  await deleteFiles(a.storagePath, a.variants as Variants | null);
+  await deleteFiles(a.storagePath, a.variants as Variants | null, (a.storageProvider as StorageProviderName) ?? 'local');
   await prisma.mediaAsset.delete({ where: { id } });
   return { id, usageCount: a._count.usages };
 }
@@ -192,9 +237,12 @@ export async function detachUsage(mediaId: string, entityType: string, entityId:
  */
 export async function attachMediaByUrl(url: string | null | undefined, entityType: string, entityId: string, field?: string): Promise<void> {
   if (!url) return;
-  const m = /\/uploads\/([^/?#]+)$/.exec(url);
-  if (!m) return;
-  const asset = await prisma.mediaAsset.findFirst({ where: { storagePath: m[1] }, select: { id: true } });
+  // Object keys are the last path segment for BOTH providers — `/uploads/{key}` (local) and
+  // `https://bucket.s3.../{key}` or a CDN base + key (s3). Match by that key; an external
+  // Amazon URL simply won't match any asset (no-op). This only LINKS usage — never deletes.
+  const key = url.split(/[?#]/)[0].replace(/\/+$/, '').split('/').pop();
+  if (!key) return;
+  const asset = await prisma.mediaAsset.findFirst({ where: { storagePath: key }, select: { id: true } });
   if (!asset) return;
   await attachUsage(asset.id, entityType, entityId, field).catch(() => undefined);
 }
