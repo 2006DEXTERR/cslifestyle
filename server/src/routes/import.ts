@@ -10,9 +10,11 @@ import {
   importAsinsSchema,
   importCategoriesSchema,
   createTemplateSchema,
+  importPaapiWizardSchema,
 } from '../validation/import.schemas';
 import * as ctrl from '../controllers/import/import.controller';
 import * as apiCtrl from '../controllers/import/api-import.controller';
+import * as wizardCtrl from '../controllers/import/paapi-wizard.controller';
 
 /**
  * Import Center API (mounted at `/api`). Reads need `import.view`; creating jobs
@@ -44,6 +46,24 @@ importRouter.post(
   auditLogger('import.api_start', 'import'),
   asyncHandler(apiCtrl.startApiImport),
 );
+
+/**
+ * @openapi
+ * /api/admin/import/api/wizard:
+ *   post: { tags: [Import], summary: "Amazon PA-API Import Wizard — validate + enqueue a background keyword→product resolution (import.create). PA-API runs in the worker, never in-request; resolved rows feed the existing csv_product importer. Set dryRun:true to preview.", responses: { 202: { description: Queued }, 400: { description: Not configured / queue disabled } } }
+ * /api/admin/import/api/wizard/{id}:
+ *   get: { tags: [Import], summary: "Wizard resolution job status — state/progress/result (import.view)", responses: { 200: { description: Status } } }
+ */
+importRouter.post(
+  '/admin/import/api/wizard',
+  authenticate,
+  requireCsrf,
+  requirePermission('import.create'),
+  validateBody(importPaapiWizardSchema),
+  auditLogger('import.paapi_wizard', 'import'),
+  asyncHandler(wizardCtrl.startPaapiWizard),
+);
+importRouter.get('/admin/import/api/wizard/:id', ...view, asyncHandler(wizardCtrl.getPaapiWizardStatus));
 
 /**
  * @openapi

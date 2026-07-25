@@ -3,6 +3,29 @@ import { z } from 'zod';
 const DUP = ['skip', 'overwrite', 'create_copy'] as const;
 const TYPE = ['csv_product', 'asin', 'category'] as const;
 
+/**
+ * Amazon PA-API Import Wizard — resolves keyword searches into product rows in a
+ * background worker, then feeds them through the EXISTING csv_product import pipeline.
+ * Additive: does not touch the CSV/ASIN/category schemas above.
+ */
+export const importPaapiWizardSchema = z.object({
+  marketplace: z.string().trim().min(1).max(64).optional(), // override; defaults to env
+  categories: z
+    .array(
+      z.object({
+        category: z.string().trim().min(1).max(160), // carried onto every resolved product
+        keywords: z.array(z.string().trim().min(1).max(200)).min(1).max(50),
+        brand: z.string().trim().max(120).optional(),
+      }),
+    )
+    .min(1, 'Select at least one category with keywords')
+    .max(25),
+  productsPerKeyword: z.number().int().min(1).max(10).optional(), // SearchItems hard cap is 10
+  duplicateMode: z.enum(DUP).optional(),
+  dryRun: z.boolean().optional(), // preview only — resolve but create no products
+  name: z.string().trim().max(160).optional(),
+});
+
 export const importCsvSchema = z.object({
   fileName: z.string().trim().min(1).max(255),
   csv: z.string().min(1, 'CSV content is required').max(20_000_000),

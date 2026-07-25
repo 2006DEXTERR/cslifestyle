@@ -8,6 +8,7 @@ import { startAiGenerationWorker } from '../queues/ai-generation.worker';
 import { startAnalyticsWorker } from '../queues/analytics.worker';
 import { startMarketingWorker } from '../queues/marketing.worker';
 import { startDiscoveryWorker } from '../queues/discovery.worker';
+import { startPaapiWizardWorker } from '../queues/paapi-wizard.worker';
 
 /**
  * BullMQ worker process (run separately from the web process, e.g.
@@ -46,6 +47,9 @@ async function main(): Promise<void> {
   // Discovery worker (Phase 11: search index / recs / internal links).
   const discoveryWorkers = [startDiscoveryWorker()];
 
+  // Amazon PA-API Import Wizard worker (additive — resolves keywords → existing importer).
+  const paapiWizardWorkers = [startPaapiWizardWorker()];
+
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'Worker shutting down…');
     await Promise.all([
@@ -55,6 +59,7 @@ async function main(): Promise<void> {
       ...analyticsWorkers.map((w) => w.close()),
       ...marketingWorkers.map((w) => w.close()),
       ...discoveryWorkers.map((w) => w.close()),
+      ...paapiWizardWorkers.map((w) => w.close()),
     ]);
     await redis.quit();
     process.exit(0);
