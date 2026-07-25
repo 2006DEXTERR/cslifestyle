@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/format';
+import { PaapiWizard } from './PaapiWizard';
 import {
   importApi,
   ImportApiError,
@@ -100,10 +101,11 @@ export default function ImportCenterPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [resultJob, setResultJob] = useState<ImportJob | null>(null);
 
-  // Import through API (PA-API) state — readiness + run lifecycle (no secret values).
+  // Import through API (PA-API) state — readiness only (no secret values). The actual
+  // import now runs through the PA-API Wizard (opened from this panel's button).
   const [apiConfig, setApiConfig] = useState<ApiImportConfig | null>(null);
   const [apiState, setApiState] = useState<'checking' | 'idle' | 'running' | 'completed' | 'failed'>('checking');
-  const [apiMessage, setApiMessage] = useState<string | null>(null);
+  const [paapiWizardOpen, setPaapiWizardOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -131,22 +133,6 @@ export default function ImportCenterPage() {
       setApiState((s) => (s === 'running' ? s : 'idle'));
     }
   }, []);
-
-  const startApiImport = useCallback(async () => {
-    setApiState('running');
-    setApiMessage(null);
-    try {
-      const r = await importApi.startApiImport();
-      setApiState('completed');
-      setApiMessage(r.message);
-      void refresh();
-    } catch (err) {
-      // Surfaces the clear backend message (e.g. "Amazon PA-API credentials are not configured.")
-      setApiState('failed');
-      setApiMessage(friendlyError(err));
-      void checkApiConfig();
-    }
-  }, [refresh, checkApiConfig]);
 
   useEffect(() => {
     void checkApiConfig();
@@ -432,27 +418,14 @@ export default function ImportCenterPage() {
                     </div>
                   )}
 
-                  {/* Result / error message (no secrets). */}
-                  {apiMessage && (
-                    <div
-                      className={cn(
-                        'mt-4 rounded-lg p-3 text-sm',
-                        apiState === 'failed' ? 'bg-red-500/5 text-red-600' : 'bg-green-500/5 text-green-700',
-                      )}
-                    >
-                      {apiMessage}
-                    </div>
-                  )}
-
                   {/* Actions */}
                   <div className="mt-5 flex flex-wrap items-center gap-3">
                     <button
-                      onClick={startApiImport}
-                      disabled={!ready || apiState === 'running' || apiState === 'checking'}
-                      className="inline-flex items-center gap-2 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                      onClick={() => setPaapiWizardOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-brand-gradient px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
                     >
-                      <RefreshCw className={cn('h-4 w-4', apiState === 'running' && 'animate-spin')} />
-                      Start API Import
+                      <RefreshCw className="h-4 w-4" />
+                      Open PA-API Wizard
                     </button>
                     <button
                       onClick={checkApiConfig}
@@ -472,12 +445,15 @@ export default function ImportCenterPage() {
                   </div>
 
                   <p className="mt-3 text-xs text-muted-foreground">
-                    PA-API only — never scrapes. Fetched results are written to <code>{apiConfig?.reviewFile ?? 'amazon-products.review.csv'}</code> for review;
-                    products are not published until you apply them.
+                    PA-API only — never scrapes. Use the wizard to search by category &amp; keyword; resolved products import as
+                    drafts for review and are not published until you approve them.
                   </p>
                 </div>
               );
             })()}
+
+            {/* Amazon PA-API Import Wizard (additive) — keyword → PA-API → existing importer. */}
+            <PaapiWizard onCreated={() => void refresh()} open={paapiWizardOpen} onOpenChange={setPaapiWizardOpen} />
           </motion.div>
         )}
 

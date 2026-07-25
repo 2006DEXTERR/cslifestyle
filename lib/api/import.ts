@@ -181,7 +181,49 @@ export const importApi = {
   getApiConfig: (): Promise<ApiImportConfig> => request<ApiImportConfig>('/admin/import/api/config', { method: 'GET' }),
   startApiImport: (): Promise<ApiImportStartResult> => request<ApiImportStartResult>('/admin/import/api/start', { method: 'POST' }),
   getApiHistory: (): Promise<ApiImportHistoryRow[]> => request<ApiImportHistoryRow[]>('/admin/import/api/history', { method: 'GET' }),
+
+  // ── Amazon PA-API Import Wizard (additive; always-queued) ──
+  startPaapiWizard: (input: PaapiWizardInput): Promise<PaapiWizardStart> =>
+    request<PaapiWizardStart>('/admin/import/api/wizard', { method: 'POST', body: JSON.stringify(input) }),
+  getPaapiWizardStatus: (id: string): Promise<PaapiWizardStatus> =>
+    request<PaapiWizardStatus>(`/admin/import/api/wizard/${id}`, { method: 'GET' }),
 };
+
+export interface PaapiWizardCategoryInput {
+  category: string;
+  keywords: string[];
+  brand?: string;
+}
+export interface PaapiWizardInput {
+  marketplace?: string;
+  categories: PaapiWizardCategoryInput[];
+  productsPerKeyword?: number;
+  duplicateMode?: DuplicateMode;
+  dryRun?: boolean;
+  name?: string;
+}
+export interface PaapiWizardStart {
+  resolveJobId: string;
+  dryRun: boolean;
+}
+export interface PaapiWizardPreviewRow {
+  category: string;
+  keyword: string;
+  asin: string;
+  title: string;
+  brand: string;
+  image: string;
+}
+export interface PaapiWizardStatus {
+  resolveJobId: string;
+  state: string; // waiting | active | completed | failed | delayed
+  progress: number;
+  result:
+    | { dryRun: true; resolved: number; rows: PaapiWizardPreviewRow[] }
+    | { dryRun: false; importJobId: string; resolved: number; productRows: number }
+    | null;
+  error: string | null;
+}
 
 export interface ApiImportConfig {
   provider: 'amazon-paapi';
