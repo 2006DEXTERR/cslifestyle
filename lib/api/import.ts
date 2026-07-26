@@ -182,11 +182,9 @@ export const importApi = {
   startApiImport: (): Promise<ApiImportStartResult> => request<ApiImportStartResult>('/admin/import/api/start', { method: 'POST' }),
   getApiHistory: (): Promise<ApiImportHistoryRow[]> => request<ApiImportHistoryRow[]>('/admin/import/api/history', { method: 'GET' }),
 
-  // ── Amazon PA-API Import Wizard (additive; always-queued) ──
-  startPaapiWizard: (input: PaapiWizardInput): Promise<PaapiWizardStart> =>
-    request<PaapiWizardStart>('/admin/import/api/wizard', { method: 'POST', body: JSON.stringify(input) }),
-  getPaapiWizardStatus: (id: string): Promise<PaapiWizardStatus> =>
-    request<PaapiWizardStatus>(`/admin/import/api/wizard/${id}`, { method: 'GET' }),
+  // ── Amazon PA-API Import Wizard (direct/synchronous; no queue) ──
+  startPaapiWizard: (input: PaapiWizardInput): Promise<PaapiWizardResult> =>
+    request<PaapiWizardResult>('/admin/import/api/wizard', { method: 'POST', body: JSON.stringify(input) }),
 };
 
 export interface PaapiWizardCategoryInput {
@@ -202,10 +200,6 @@ export interface PaapiWizardInput {
   dryRun?: boolean;
   name?: string;
 }
-export interface PaapiWizardStart {
-  resolveJobId: string;
-  dryRun: boolean;
-}
 export interface PaapiWizardPreviewRow {
   category: string;
   keyword: string;
@@ -214,16 +208,10 @@ export interface PaapiWizardPreviewRow {
   brand: string;
   image: string;
 }
-export interface PaapiWizardStatus {
-  resolveJobId: string;
-  state: string; // waiting | active | completed | failed | delayed
-  progress: number;
-  result:
-    | { dryRun: true; resolved: number; rows: PaapiWizardPreviewRow[] }
-    | { dryRun: false; importJobId: string; resolved: number; productRows: number }
-    | null;
-  error: string | null;
-}
+/** Direct/synchronous result returned by POST /admin/import/api/wizard. */
+export type PaapiWizardResult =
+  | { dryRun: true; resolved: number; rows: PaapiWizardPreviewRow[] }
+  | { dryRun: false; importJobId: string; resolved: number; productRows: number };
 
 export interface ApiImportConfig {
   provider: 'amazon-paapi';

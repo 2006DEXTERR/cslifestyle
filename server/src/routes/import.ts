@@ -50,9 +50,7 @@ importRouter.post(
 /**
  * @openapi
  * /api/admin/import/api/wizard:
- *   post: { tags: [Import], summary: "Amazon PA-API Import Wizard — validate + enqueue a background keyword→product resolution (import.create). PA-API runs in the worker, never in-request; resolved rows feed the existing csv_product importer. Set dryRun:true to preview.", responses: { 202: { description: Queued }, 400: { description: Not configured / queue disabled } } }
- * /api/admin/import/api/wizard/{id}:
- *   get: { tags: [Import], summary: "Wizard resolution job status — state/progress/result (import.view)", responses: { 200: { description: Status } } }
+ *   post: { tags: [Import], summary: "Amazon PA-API Import Wizard — DIRECT synchronous keyword→product resolution (import.create). Resolves PA-API in memory and hands products to the existing csv_product importer; set dryRun:true to preview. No queue.", responses: { 201: { description: Import created }, 200: { description: Dry-run preview }, 400: { description: Not configured / no results } } }
  */
 importRouter.post(
   '/admin/import/api/wizard',
@@ -63,7 +61,6 @@ importRouter.post(
   auditLogger('import.paapi_wizard', 'import'),
   asyncHandler(wizardCtrl.startPaapiWizard),
 );
-importRouter.get('/admin/import/api/wizard/:id', ...view, asyncHandler(wizardCtrl.getPaapiWizardStatus));
 
 /**
  * @openapi

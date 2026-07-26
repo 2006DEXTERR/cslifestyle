@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Sparkles, Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { importApi, ImportApiError, type PaapiWizardInput, type PaapiWizardStatus, type DuplicateMode } from '@/lib/api/import';
+import { importApi, ImportApiError, type PaapiWizardInput, type PaapiWizardResult, type DuplicateMode } from '@/lib/api/import';
 import { catalogApi } from '@/lib/api/catalog';
 
 /**
@@ -50,16 +50,13 @@ export function PaapiWizard({
 
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [status, setStatus] = React.useState<PaapiWizardStatus | null>(null);
-  const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const [result, setResult] = React.useState<PaapiWizardResult | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     void catalogApi.listCategories({ status: 'active' }).then((r) => setCats(r.map((c) => ({ slug: c.slug, name: c.name })))).catch(() => undefined);
     void catalogApi.listBrands({ status: 'active' }).then((r) => setBrands(r.map((b) => ({ slug: b.slug, name: b.name })))).catch(() => undefined);
   }, [open]);
-
-  React.useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const setGroup = (i: number, patch: Partial<CatGroup>) =>
     setGroups((g) => g.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
@@ -86,40 +83,23 @@ export function PaapiWizard({
     };
   };
 
-  const poll = (id: string) => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      try {
-        const s = await importApi.getPaapiWizardStatus(id);
-        setStatus(s);
-        if (s.state === 'completed' || s.state === 'failed') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setBusy(false);
-          if (s.state === 'completed' && s.result && s.result.dryRun === false) onCreated();
-        }
-      } catch {
-        /* keep polling briefly; transient */
-      }
-    }, 2000);
-  };
-
+  // Direct/synchronous: the request resolves PA-API + creates the import, then returns.
   const run = async (dryRun: boolean) => {
     setError(null);
-    setStatus(null);
+    setResult(null);
     const input = buildInput(dryRun);
     if (!input) return;
     setBusy(true);
     try {
-      const { resolveJobId } = await importApi.startPaapiWizard(input);
-      setStatus({ resolveJobId, state: 'waiting', progress: 0, result: null, error: null });
-      poll(resolveJobId);
+      const res = await importApi.startPaapiWizard(input);
+      setResult(res);
+      if (!res.dryRun) onCreated();
     } catch (e) {
+      setError(e instanceof ImportApiError ? e.message : 'Import failed. Check PA-API credentials and try again.');
+    } finally {
       setBusy(false);
-      setError(e instanceof ImportApiError ? e.message : 'Failed to start. Is the background queue enabled?');
     }
   };
-
-  const result = status?.result ?? null;
 
   return (
     <div className="rounded-xl border border-border bg-card">
@@ -135,7 +115,7 @@ export function PaapiWizard({
           <div>
             <h3 className="font-semibold text-foreground">Amazon PA-API Import Wizard</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Pick categories &amp; keywords — we search Amazon PA-API in the background and feed the results into the existing importer for review &amp; publish.
+              Pick categories &amp; keywords — we search Amazon PA-API and feed the results straight into the existing importer for review &amp; publish.
             </p>
           </div>
         </div>
@@ -231,63 +211,56 @@ export function PaapiWizard({
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           {/* Actions */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" disabled={busy} onClick={() => void run(true)}>
-              {busy && status?.result === null ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Preview (Dry Run)
             </Button>
             <Button className="bg-brand-gradient hover:opacity-90" disabled={busy} onClick={() => void run(false)}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Start Import
             </Button>
+            {busy && (
+              <span className="text-xs text-muted-foreground">Searching Amazon PA-API… this can take a moment.</span>
+            )}
           </div>
 
-          {/* Live status */}
-          {status && (
+          {/* Result (direct — no queue polling) */}
+          {result && (
             <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="font-medium capitalize">Resolution: {status.state}</span>
-                <span className="text-muted-foreground">{status.progress}%</span>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full bg-brand-gradient transition-all" style={{ width: `${status.progress}%` }} />
-              </div>
-
-              {status.state === 'failed' && (
-                <p className="mt-3 text-red-600">{status.error ?? 'Resolution failed.'}</p>
-              )}
-
-              {result && result.dryRun === true && (
-                <div className="mt-3">
+              {result.dryRun ? (
+                <div>
                   <p className="mb-2 font-medium">Preview — {result.resolved} product(s) resolved (nothing imported):</p>
-                  <div className="max-h-64 overflow-auto rounded-md border border-border">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/50 text-left text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2">ASIN</th>
-                          <th className="px-3 py-2">Title</th>
-                          <th className="px-3 py-2">Brand</th>
-                          <th className="px-3 py-2">Category</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {result.rows.map((r) => (
-                          <tr key={r.asin}>
-                            <td className="px-3 py-1.5 font-mono">{r.asin}</td>
-                            <td className="px-3 py-1.5">{r.title}</td>
-                            <td className="px-3 py-1.5">{r.brand}</td>
-                            <td className="px-3 py-1.5">{r.category}</td>
+                  {result.rows.length === 0 ? (
+                    <p className="text-muted-foreground">No products matched those keywords.</p>
+                  ) : (
+                    <div className="max-h-64 overflow-auto rounded-md border border-border">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/50 text-left text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-2">ASIN</th>
+                            <th className="px-3 py-2">Title</th>
+                            <th className="px-3 py-2">Brand</th>
+                            <th className="px-3 py-2">Category</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {result.rows.map((r) => (
+                            <tr key={r.asin}>
+                              <td className="px-3 py-1.5 font-mono">{r.asin}</td>
+                              <td className="px-3 py-1.5">{r.title}</td>
+                              <td className="px-3 py-1.5">{r.brand}</td>
+                              <td className="px-3 py-1.5">{r.category}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {result && result.dryRun === false && (
-                <p className="mt-3 text-green-600">
-                  Resolved {result.productRows} product(s) → import created. Track it in the <strong>Import Queue</strong> / <strong>History</strong> tabs; products land as drafts for review &amp; publish.
+              ) : (
+                <p className="text-green-600">
+                  Resolved {result.productRows} product(s) → import created. See the <strong>Import Queue</strong> / <strong>History</strong> tabs; products land as drafts for review &amp; publish.
                 </p>
               )}
             </div>

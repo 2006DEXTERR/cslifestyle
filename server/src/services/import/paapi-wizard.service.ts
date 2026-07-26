@@ -1,5 +1,4 @@
 import type { DuplicateMode } from '@prisma/client';
-import { env } from '../../config/env';
 import { ApiError } from '../../lib/http';
 import { logger } from '../../lib/logger';
 import {
@@ -10,14 +9,15 @@ import {
   type ReviewRow,
 } from './amazon-paapi';
 import { createCsvJob } from './import.service';
-import { getPaapiWizardQueue } from '../../queues/paapiWizardBullmq';
 
 /**
- * Amazon PA-API Import Wizard (additive). The HTTP request only VALIDATES and ENQUEUES —
- * PA-API is never called in-request. A dedicated `paapi-wizard` BullMQ worker resolves the
- * keywords in memory (no CSV/temp files) and then hands the generated product rows to the
- * EXISTING `createCsvJob()`, so the normal csv_product ImportJob performs the actual import
- * (progress, retry, history, dedupe, drafts, AI generation, media, review/publish).
+ * Amazon PA-API Import Wizard — DIRECT synchronous flow (no BullMQ/Redis worker).
+ *
+ * The HTTP request resolves the keywords against Amazon PA-API SearchItems in memory,
+ * de-dupes by ASIN, builds product rows in memory, and hands them straight to the EXISTING
+ * `createCsvJob()` importer — which creates the csv_product ImportJob, products/drafts,
+ * history and progress exactly as a normal CSV import does. No queue, no disk/temp files.
+ * The batch is capped small so the request stays bounded (~1.1s per keyword of PA-API pacing).
  */
 
 export interface PaapiWizardCategory {
@@ -34,12 +34,7 @@ export interface PaapiWizardInput {
   name?: string;
 }
 
-interface WizardJobData {
-  input: PaapiWizardInput;
-  userId: string | null;
-}
-
-/** Preview row surfaced to the admin during a dry run (no products created). */
+/** Row surfaced in a dry-run preview (nothing imported). */
 export interface WizardPreviewRow {
   category: string;
   keyword: string;
@@ -49,8 +44,14 @@ export interface WizardPreviewRow {
   image: string;
 }
 
-const MAX_KEYWORDS = 200; // protects PA-API rate limits per wizard run
-const PACE_MS = 1100; // matches the existing PA-API pacing between keyword searches
+export type PaapiWizardResult =
+  | { dryRun: true; resolved: number; rows: WizardPreviewRow[] }
+  | { dryRun: false; importJobId: string; resolved: number; productRows: number };
+
+// Direct/synchronous → keep the batch small so the request cannot run long. Each keyword is
+// ONE PA-API call (SearchItems returns up to productsPerKeyword items in that single call).
+const MAX_KEYWORDS = 20;
+const PACE_MS = 1100; // PA-API TPS pacing between keyword searches
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 function totalKeywords(input: PaapiWizardInput): number {
@@ -68,49 +69,7 @@ function resolveConfig(marketplace?: string): PaapiConfig {
   return res.config;
 }
 
-/**
- * Validate + enqueue a wizard run. Runs in the HTTP request — NO PA-API call here.
- * Requires the BullMQ queue driver (always-queued architecture); refuses under `inline`.
- */
-export async function submitPaapiWizard(
-  input: PaapiWizardInput,
-  userId: string | null,
-): Promise<{ resolveJobId: string; dryRun: boolean }> {
-  if (env.QUEUE_DRIVER !== 'bullmq') {
-    throw ApiError.badRequest(
-      'The PA-API Import Wizard runs on the background queue. Set QUEUE_DRIVER=bullmq and start the worker (npm run worker) to use it.',
-    );
-  }
-  resolveConfig(input.marketplace); // validates credentials up front (throws 400 if missing) — no network call
-  const count = totalKeywords(input);
-  if (count === 0) throw ApiError.badRequest('Provide at least one keyword');
-  if (count > MAX_KEYWORDS) throw ApiError.badRequest(`Too many keywords (${count}); max ${MAX_KEYWORDS} per run`);
-
-  const data: WizardJobData = { input, userId };
-  const job = await getPaapiWizardQueue().add('resolve', data);
-  logger.info({ jobId: job.id, dryRun: Boolean(input.dryRun), keywords: count }, 'PA-API wizard job enqueued');
-  return { resolveJobId: String(job.id), dryRun: Boolean(input.dryRun) };
-}
-
-/** Read the live state of a wizard resolution job from BullMQ (no DB, no schema). */
-export async function getPaapiWizardStatus(resolveJobId: string): Promise<Record<string, unknown>> {
-  const job = await getPaapiWizardQueue().getJob(resolveJobId);
-  if (!job) throw ApiError.notFound('Wizard job not found (it may have expired)');
-  const state = await job.getState();
-  const ret = job.returnvalue as
-    | { dryRun: true; resolved: number; rows: WizardPreviewRow[] }
-    | { dryRun: false; importJobId: string; resolved: number; productRows: number }
-    | undefined;
-  return {
-    resolveJobId: String(job.id),
-    state, // waiting | active | completed | failed | delayed | ...
-    progress: typeof job.progress === 'number' ? job.progress : 0,
-    result: ret ?? null,
-    error: job.failedReason ?? null,
-  };
-}
-
-/** CSV field escaping (RFC-4180) — wrap in quotes when the value has a comma/quote/newline. */
+/** CSV field escaping (RFC-4180). */
 function csvField(v: string): string {
   return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
@@ -123,20 +82,16 @@ function buildProductCsv(rows: WizardPreviewRow[]): string {
 }
 
 /**
- * Worker entrypoint: resolve every keyword via PA-API in memory. For a dry run, return the
- * resolved rows for preview. Otherwise generate the product CSV in memory and hand it to the
- * EXISTING createCsvJob() — the returned csv_product ImportJob does the real import.
+ * Resolve the wizard input directly (synchronous). For a dry run, returns the resolved rows
+ * for preview. Otherwise builds the in-memory product CSV and hands it to the EXISTING
+ * createCsvJob() importer, returning the created csv_product ImportJob id.
  */
-export async function runPaapiWizardResolution(
-  data: WizardJobData,
-  onProgress: (pct: number) => void = () => undefined,
-): Promise<
-  | { dryRun: true; resolved: number; rows: WizardPreviewRow[] }
-  | { dryRun: false; importJobId: string; resolved: number; productRows: number }
-> {
-  const { input, userId } = data;
-  const cfg = resolveConfig(input.marketplace);
-  const limit = Math.min(Math.max(input.productsPerKeyword ?? 1, 1), 10);
+export async function runPaapiWizard(input: PaapiWizardInput, userId: string | null): Promise<PaapiWizardResult> {
+  const cfg = resolveConfig(input.marketplace); // validates credentials up front (throws 400 if missing)
+  const count = totalKeywords(input);
+  if (count === 0) throw ApiError.badRequest('Provide at least one keyword');
+  if (count > MAX_KEYWORDS) throw ApiError.badRequest(`Too many keywords (${count}); max ${MAX_KEYWORDS} per direct import`);
+  const limit = Math.min(Math.max(input.productsPerKeyword ?? 1, 1), 10); // PA-API SearchItems hard cap is 10
 
   // Flatten to keyword tasks (carry category + optional brand).
   const tasks: { category: string; keyword: string; brand: string }[] = [];
@@ -158,7 +113,6 @@ export async function runPaapiWizardResolution(
       seen.add(r.asin);
       rows.push({ category: t.category, keyword: t.keyword, asin: r.asin, title: r.title, brand: r.brand, image: r.image });
     }
-    onProgress(Math.round(((i + 1) / tasks.length) * 100));
     if (i < tasks.length - 1) await sleep(PACE_MS); // respect PA-API TPS
   }
 
@@ -166,14 +120,14 @@ export async function runPaapiWizardResolution(
     return { dryRun: true, resolved: rows.length, rows };
   }
   if (rows.length === 0) {
-    throw new Error('PA-API returned no products for the given keywords');
+    throw ApiError.badRequest('PA-API returned no products for the given keywords');
   }
 
-  // Hand the in-memory CSV to the EXISTING importer — this creates the real csv_product job.
+  // Hand the in-memory CSV straight to the EXISTING importer — creates the csv_product job.
   const csv = buildProductCsv(rows);
   const fileName = input.name?.trim() || `paapi-wizard-${rows.length}-products.csv`;
   const job = await createCsvJob({ fileName, csv, duplicateMode: input.duplicateMode, name: input.name, userId });
   const importJobId = String((job as { id?: string }).id ?? '');
-  logger.info({ importJobId, productRows: rows.length }, 'PA-API wizard resolved → csv_product import created');
+  logger.info({ importJobId, productRows: rows.length }, 'PA-API wizard resolved → csv_product import created (direct)');
   return { dryRun: false, importJobId, resolved: rows.length, productRows: rows.length };
 }
